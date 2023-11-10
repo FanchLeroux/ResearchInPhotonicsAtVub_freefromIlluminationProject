@@ -36,6 +36,7 @@ cfg2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImag
 results1FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\results1.txt";
 results2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\results2.txt";
 
+distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet 
 w = 5.0; % gaussian input beam waist [mm]
 k = 25.0; % output beam radius [mm]
 lambda = 0.633; % wavelength [um]
@@ -45,7 +46,7 @@ entrancePupilDiameter = 6*w;
 apodizationFactor = 1/(w/(entrancePupilDiameter/2))^2;
 backFocalLength = 70;
 
-nPar = 4; % number of aspheric coefficients set as variables
+nPar = 8; % number of aspheric coefficients set as variables
 
 nRays = 5000000; % number of rays for geometrical image analysis (typical: 500000)
 imageSize = 100; % image size for geometrical image analysis
@@ -91,14 +92,17 @@ import ZOSAPI.*;
     TheLDE = TheSystem.LDE;
     TheLDE.InsertNewSurfaceAt(2);
     TheLDE.InsertNewSurfaceAt(3);
+    Surface_0 = TheLDE.GetSurfaceAt(0);
     Surface_1 = TheLDE.GetSurfaceAt(1);
     Surface_2 = TheLDE.GetSurfaceAt(2);
     Surface_3 = TheLDE.GetSurfaceAt(3);
     
     % Changes surface cells in LDE
+    
+    Surface_0.Thickness = distanceSourceLens;
     Surface_1.Thickness = 5.0;
     Surface_1.Comment = 'dummy';
-    Surface_2.Thickness = 15.0;
+    Surface_2.Thickness = 100;
     Surface_2.Comment = 'front of lens';
     Surface_2.Material = 'N-BK7';
     Surface_3.Thickness = backFocalLength;
