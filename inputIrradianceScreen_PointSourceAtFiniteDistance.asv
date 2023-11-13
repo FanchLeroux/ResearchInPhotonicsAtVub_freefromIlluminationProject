@@ -33,10 +33,11 @@ q = (inputPlaneSampling-r)/2;
 [x,y] = meshgrid((-q:q-1+r),(q-1+r:-1:-q)); % if inputPlaneSmapling is even, the origin is the bottom right of the four central pixels
 
 inputPlane = (x.^2+y.^2).^0.5;
-inputPlane(inputPlane>q) = 0; 
+mask = inputPlane<=q; % circular pupil
 inputPlane = inputPlane * inputPlaneSamplingStep; % scaling to obtain a map of radial physical distances
 
 inputPlane = intensity/distanceLedInputPlane^2 * cos(atan(inputPlane/distanceLedInputPlane)).^3; % [W.m-2] irradiance map
+inputPlane = inputPlane.*mask;
 
 % save
 
@@ -47,9 +48,12 @@ save(dirc+filename+".mat", "inputPlane")
 % as fits file
 fitswrite(inputPlane, dirc+filename+".fits")
 
-% sanity check
+% sanity check (does not work)
 
-% if theta = 90°, la somme des irradiances devraient donne
+% si theta = 90°, la somme des irradiances devraient donner 2pi W pour une
+% intensitée de 1
+
+total = sum(sum(inputPlane))*inputPlaneSamplingStep^2 / (2*pi) 
 
 
 

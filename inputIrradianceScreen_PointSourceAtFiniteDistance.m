@@ -17,7 +17,7 @@ n=1; % index of refraction
 
 intensity = 1; % [W/sr] intensity of the point source
 
-theta=82; % ° half angle of the maximum cone of light emitted by the LED reaching the input plane 
+theta=88.5; % ° half angle of the maximum cone of light emitted by the LED reaching the input plane 
 distanceLedInputPlane = 6e-3; % [m]
 
 inputPlaneSampling = 100; % nuber of pixels in one pupil diameter
@@ -32,11 +32,12 @@ r = mod(inputPlaneSampling, 2);
 q = (inputPlaneSampling-r)/2;
 [x,y] = meshgrid((-q:q-1+r),(q-1+r:-1:-q)); % if inputPlaneSmapling is even, the origin is the bottom right of the four central pixels
 
-inputPlane = (x.^2+y.^2).^0.5; 
+inputPlane = (x.^2+y.^2).^0.5;
+mask = inputPlane<=q; % circular pupil
 inputPlane = inputPlane * inputPlaneSamplingStep; % scaling to obtain a map of radial physical distances
 
 inputPlane = intensity/distanceLedInputPlane^2 * cos(atan(inputPlane/distanceLedInputPlane)).^3; % [W.m-2] irradiance map
-inputPlane(inputPlane>q) = 0; % circular pupil
+inputPlane = inputPlane.*mask;
 
 % save
 
@@ -47,10 +48,11 @@ save(dirc+filename+".mat", "inputPlane")
 % as fits file
 fitswrite(inputPlane, dirc+filename+".fits")
 
-% sanity check (does not work)
+% sanity check
 
 % si theta = 90°, la somme des irradiances devraient donner 2pi W pour une
-% intensitée de 1
+% intensitée de 1. En pratique on voit des erreurs numériques apparaitre
+% au dela de 88.5 °
 
 total = sum(sum(inputPlane))*inputPlaneSamplingStep^2 / (2*pi); 
 
