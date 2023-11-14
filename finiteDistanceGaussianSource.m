@@ -60,7 +60,7 @@ sample = 80; % pupil sampling for the ray-mapping function targets computations
 nRays = 5000; % number of rays for geometrical image analysis (typical: 5000000)
 imageSize = 100; % image size for geometrical image analysis
 
-% 8<----- ############################################################## -------8<
+% 8<----- ############################################################## ------->8
 
 import ZOSAPI.*;
     
