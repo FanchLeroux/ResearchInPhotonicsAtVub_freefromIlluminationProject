@@ -24,40 +24,49 @@ end
 end
 
 %% body
-function [r] = BeginApplication(TheApplication, args)
+function [r] = BeginApplication(TheApplication, ~)
+
+% 8<------------------------ Define directories and file names ------------------------------>8
 
 dirc = 'D:\moi\vub\researchInPhotonics\zemax\zosApi\'; % directory where the ZEMAX .zos file will be generated
 zemaxFileName = 'inputFiniteDistanceGaussianSource_outputCircularUniformIrradiance.zos';
-
-% 8<----- Define system parameters -----
 
 cfg1FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis1.cfg";
 cfg2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis2.cfg";
 results1FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\results1.txt";
 results2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\results2.txt";
 
-distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet 
-w = 5.0; % gaussian input beam waist [mm]
-k = 25.0; % output beam radius [mm]
-lambda = 0.633; % wavelength [um]
-sample = 80; % pupil sampling
+% 8<---------------------------- Define system parameters ----------------------------------->8
 
-entrancePupilDiameter = 6*w;
-apodizationFactor = 1/(w/(entrancePupilDiameter/2))^2;
+    % system design
+distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet 
+apertureAngle = 16.6; % [°]
+objectSpaceNA = sin(pi/180 * apertureAngle);
+apodizationFactor = 9; %1/(w/(entrancePupilDiameter/2))^2;
 backFocalLength = 70;
 
-nPar = 8; % number of aspheric coefficients set as variables
+    % input and output irradiance distributions
+w = 5.0; % gaussian input beam waist [mm]
+k = 25.0; % output beam radius [mm]
 
+    % wavelength
+lambda = 0.633; % wavelength [um]
+
+    % optimization
+nPar = 8; % number of aspheric coefficients set as variables
+sample = 80; % pupil sampling for the ray-mapping function targets computations
+
+    % analysis
 nRays = 5000; % number of rays for geometrical image analysis (typical: 5000000)
 imageSize = 100; % image size for geometrical image analysis
 
-% 8<----- ######################## -----
+% 8<----- ############################################################## -------8<
 
 import ZOSAPI.*;
     
     % creates a new API directory
     apiPath = System.String.Concat(TheApplication.SamplesDir, '\API\Matlab');
-    if (exist(char(apiPath)) == 0) 
+    if (exist(char(apiPath), 'dir') == 0) 
         mkdir(char(apiPath)); 
     end
     
@@ -73,19 +82,16 @@ import ZOSAPI.*;
     
     % Aperture
     TheSystemData = TheSystem.SystemData;
-    TheSystemData.Aperture.ApertureValue = entrancePupilDiameter;
+    TheSystemData.Aperture.ApertureType = ZOSAPI.SystemData.ZemaxApertureType.ObjectSpaceNA;
+    TheSystemData.Aperture.ApertureValue = objectSpaceNA;
     TheSystemData.Aperture.ApodizationType = ZOSAPI.SystemData.ZemaxApodizationType.Gaussian;    
     TheSystemData.Aperture.ApodizationFactor = apodizationFactor;
     
     % Set Surface 2 as the Global Coordinate Reference Surface
-    TheSystemData.Aperture.SetCurrentGCRSSurf(2)
-    
-    % Fields
-    %Field_1 = TheSystemData.Fields.GetField(1);
-    %NewField_2 = TheSystemData.Fields.AddField(0,5.0,1.0);
+    TheSystemData.Aperture.SetCurrentGCRSSurf(2);
     
     % Set Wavelength
-    TheSystemData.Wavelengths.RemoveWavelength(1)
+    TheSystemData.Wavelengths.RemoveWavelength(1);
     TheSystemData.Wavelengths.AddWavelength(lambda, 1.0);
     
     % Lens data 
@@ -99,7 +105,7 @@ import ZOSAPI.*;
     
     % Changes surface cells in LDE
     
-    Surface_0.Thickness = distanceSourceLens-5;
+    Surface_0.Thickness = distanceSourceLens-5; % -5 term because of the dummy surface between the lens and the object
     Surface_1.Thickness = 5.0;
     Surface_1.Comment = 'dummy';
     Surface_2.Thickness = 30;
@@ -115,7 +121,11 @@ import ZOSAPI.*;
     % set stop
     Surface_2.IsStop = true;
     
-    % 8<----- Set variables -----
+    % get entrance pupil diameter
+    entrancePupilDiameter = Surface_2.GetCellAt(6).Value;
+    entrancePupilDiameter = 2*str2double(char(entrancePupilDiameter)); % fix data type issues and converting the radius in diameter
+    
+    % 8<--------------------------- Set variables ----------------------------------------------->8
     
     % set radius of surface 2 variable
     Surface_2.RadiusCell.MakeSolveVariable();
@@ -190,9 +200,9 @@ import ZOSAPI.*;
         % change analysis settings
     analysis1Settings = analysis1.GetSettings();
     analysis1Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.SpotDiagram; % make sure to perform this step before saving the settings in a configuration file
-    analysis1Settings.SaveTo(cfg1FileName)
-    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_KRAYS', string(nRays/1000))
-    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize))
+    analysis1Settings.SaveTo(cfg1FileName);
+    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_KRAYS', string(nRays/1000));
+    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
     
     analysis1Settings.LoadFrom(cfg1FileName);
     
@@ -200,10 +210,10 @@ import ZOSAPI.*;
     analysis1.Terminate();
     analysis1.WaitForCompletion();
     toc;
-    % save results under text file
     
+    % save results under text file
     results1 = analysis1.GetResults();
-    results1.GetTextFile(results1FileName)
+    results1.GetTextFile(results1FileName);
     
     % read results text file
     
@@ -214,9 +224,9 @@ import ZOSAPI.*;
     % change analysis settings
     analysis2Settings = analysis2.GetSettings();
     analysis2Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.CrossX;
-    analysis2Settings.SaveTo(cfg2FileName)
-    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/2000))
-    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize))
+    analysis2Settings.SaveTo(cfg2FileName);
+    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/2000));
+    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize));
     analysis2Settings.LoadFrom(cfg2FileName);
     
     tic;
@@ -227,14 +237,14 @@ import ZOSAPI.*;
     % save results under text file
     
     results2 = analysis2.GetResults();
-    results2.GetTextFile(results2FileName)
+    results2.GetTextFile(results2FileName);
     
     data2 = readmatrix(results2FileName);
     
     % figures
     
     figure(1)
-    plot(data1(:,8), data1(:,9), '+');
+    plot(data1(:,8), data1(:,9), '+')
     axis equal
     title("Image plane positional spot diagram")
     
