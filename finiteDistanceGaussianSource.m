@@ -39,8 +39,8 @@ results2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\results2
 % 8<---------------------------- Define system parameters ----------------------------------->8
 
     % system design
-distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet 
-apertureAngle = 16.6; % [°]
+distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet (works with 50)
+apertureAngle = 16.6; % [°] (works with 16.6)
 objectSpaceNA = sin(pi/180 * apertureAngle);
 apodizationFactor = 9; %1/(w/(entrancePupilDiameter/2))^2;
 backFocalLength = 70;
@@ -174,8 +174,8 @@ import ZOSAPI.*;
         edgeConstraint_Surf2cell = edgeConstraint.GetCellAt(3);
         edgeConstraint_Surf2cell.IntegerValue = 3;
         
-        edgeConstraint.Weight = 0;
-        edgeConstraint.Target = 5;
+        edgeConstraint.Weight = sample;
+        edgeConstraint.Target = 1;
         
     % optimize
     
@@ -225,7 +225,7 @@ import ZOSAPI.*;
     analysis2Settings = analysis2.GetSettings();
     analysis2Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.CrossX;
     analysis2Settings.SaveTo(cfg2FileName);
-    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/2000));
+    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/1000));
     analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize));
     analysis2Settings.LoadFrom(cfg2FileName);
     
