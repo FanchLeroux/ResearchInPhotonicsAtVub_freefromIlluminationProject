@@ -17,7 +17,7 @@ n=1; % index of refraction
 
 intensity = 1; % [W/sr] intensity of the point source
 
-theta=88.5; % ° half angle of the maximum cone of light emitted by the LED reaching the input plane 
+theta=82; % ° half angle of the maximum cone of light emitted by the LED reaching the input plane 
 distanceLedInputPlane = 6e-3; % [m]
 
 inputPlaneSampling = 100; % nuber of pixels in one pupil diameter
@@ -50,11 +50,10 @@ fitswrite(inputPlane, dirc+filename+".fits")
 
 % sanity check
 
-% si theta = 90°, la somme des irradiances devraient donner 2pi W pour une
-% intensitée de 1. En pratique on voit des erreurs numériques apparaitre
-% au dela de 88.5 °
+% as theta tend towards 90°, the integral of the irradiance should give 2pi [W] for a unitary intensity. 
+% In practice numerical errors start to appear above 88.5 °
 
-total = sum(sum(inputPlane))*inputPlaneSamplingStep^2 / (2*pi); 
+% total = sum(sum(inputPlane))*inputPlaneSamplingStep^2 / (2*pi); 
 
 
 
