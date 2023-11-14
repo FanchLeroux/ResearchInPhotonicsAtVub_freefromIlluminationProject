@@ -48,7 +48,7 @@ backFocalLength = 70;
 
 nPar = 8; % number of aspheric coefficients set as variables
 
-nRays = 5000000; % number of rays for geometrical image analysis (typical: 500000)
+nRays = 5000; % number of rays for geometrical image analysis (typical: 5000000)
 imageSize = 100; % image size for geometrical image analysis
 
 % 8<----- ######################## -----
@@ -99,10 +99,10 @@ import ZOSAPI.*;
     
     % Changes surface cells in LDE
     
-    Surface_0.Thickness = distanceSourceLens;
+    Surface_0.Thickness = distanceSourceLens-5;
     Surface_1.Thickness = 5.0;
     Surface_1.Comment = 'dummy';
-    Surface_2.Thickness = 100;
+    Surface_2.Thickness = 30;
     Surface_2.Comment = 'front of lens';
     Surface_2.Material = 'N-BK7';
     Surface_3.Thickness = backFocalLength;
@@ -134,6 +134,7 @@ import ZOSAPI.*;
     
     TheMFE = TheSystem.MFE;
     
+        % ray-mapping
     for j = 1:sample
         
         Operand_j = TheMFE.InsertNewOperandAt(j);
@@ -154,6 +155,18 @@ import ZOSAPI.*;
         
     end
     
+        % constraints
+        edgeConstraint = TheMFE.InsertNewOperandAt(sample+1);
+        edgeConstraint.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.MNEG);
+        
+        edgeConstraint_Surf1cell = edgeConstraint.GetCellAt(2);
+        edgeConstraint_Surf1cell.IntegerValue = 2;
+        edgeConstraint_Surf2cell = edgeConstraint.GetCellAt(3);
+        edgeConstraint_Surf2cell.IntegerValue = 3;
+        
+        edgeConstraint.Weight = 0;
+        edgeConstraint.Target = 5;
+        
     % optimize
     
     tic;
@@ -232,7 +245,7 @@ import ZOSAPI.*;
     
     % std computation
     
-    standardDeviation = std(dataCrossX(25:76))
+    standardDeviation = std(dataCrossX(25:76));
     
     % Save and close
     TheSystem.Save();
