@@ -3,6 +3,8 @@
 %% main programm
 function [ r ] = finiteDistanceGaussianSource( args )
 
+clc; format compact; clear;
+
 if ~exist('args', 'var')
     args = [];
 end
@@ -33,8 +35,8 @@ zemaxFileName = 'inputFiniteDistanceGaussianSource_outputCircularUniformIrradian
 
 cfg1FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis1.cfg";
 cfg2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis2.cfg";
-results1FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\results1.txt";
-results2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\results2.txt";
+
+resultDir = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\";
 
 % 8<---------------------------- Define system parameters ----------------------------------->8
 
@@ -53,11 +55,11 @@ k = 25.0; % output beam radius [mm]
 lambda = 0.633; % wavelength [um]
 
     % optimization
-nPar = 8; % number of aspheric coefficients set as variables
-sample = 80; % pupil sampling for the ray-mapping function targets computations
+nParMax = 8; % number of aspheric coefficients set as variables
+sample = 100; % pupil sampling for the ray-mapping function targets computations
 
     % analysis
-nRays = 5000; % number of rays for geometrical image analysis (typical: 5000000)
+nRays = 5000000; % number of rays for geometrical image analysis (typical: 5000000)
 imageSize = 100; % image size for geometrical image analysis
 
 % 8<----- ############################################################## ------->8
@@ -80,21 +82,22 @@ import ZOSAPI.*;
     
     TheSystem.SystemData.MaterialCatalogs.AddCatalog('SCHOTT');
     
-    % Aperture
+% 8<------------------ System explorer parameters --------------------------->8    
+    
+    % Aperture    
     TheSystemData = TheSystem.SystemData;
     TheSystemData.Aperture.ApertureType = ZOSAPI.SystemData.ZemaxApertureType.ObjectSpaceNA;
     TheSystemData.Aperture.ApertureValue = objectSpaceNA;
     TheSystemData.Aperture.ApodizationType = ZOSAPI.SystemData.ZemaxApodizationType.Gaussian;    
     TheSystemData.Aperture.ApodizationFactor = apodizationFactor;
+    TheSystemData.Aperture.SetCurrentGCRSSurf(2); % Set Surface 2 as the Global Coordinate Reference Surface
     
-    % Set Surface 2 as the Global Coordinate Reference Surface
-    TheSystemData.Aperture.SetCurrentGCRSSurf(2);
-    
-    % Set Wavelength
+    % Wavelength
     TheSystemData.Wavelengths.RemoveWavelength(1);
     TheSystemData.Wavelengths.AddWavelength(lambda, 1.0);
+
+% 8<------------------ Lens data editor parameters -------------------------->8    
     
-    % Lens data 
     TheLDE = TheSystem.LDE;
     TheLDE.InsertNewSurfaceAt(2);
     TheLDE.InsertNewSurfaceAt(3);
@@ -102,8 +105,6 @@ import ZOSAPI.*;
     Surface_1 = TheLDE.GetSurfaceAt(1);
     Surface_2 = TheLDE.GetSurfaceAt(2);
     Surface_3 = TheLDE.GetSurfaceAt(3);
-    
-    % Changes surface cells in LDE
     
     Surface_0.Thickness = distanceSourceLens-5; % -5 term because of the dummy surface between the lens and the object
     Surface_1.Thickness = 5.0;
@@ -114,37 +115,22 @@ import ZOSAPI.*;
     Surface_3.Thickness = backFocalLength;
     Surface_3.Comment = 'rear of lens';      
     
-    % set surface 2 type as even aspheric
-    SurfaceType_EvenAspheric = Surface_2.GetSurfaceTypeSettings(ZOSAPI.Editors.LDE.SurfaceType.EvenAspheric);
-    Surface_2.ChangeType(SurfaceType_EvenAspheric);
+    % set surface 3 type as even aspheric
+    SurfaceType_EvenAspheric = Surface_3.GetSurfaceTypeSettings(ZOSAPI.Editors.LDE.SurfaceType.EvenAspheric);
+    Surface_3.ChangeType(SurfaceType_EvenAspheric);
     
     % set stop
     Surface_2.IsStop = true;
     
-    % get entrance pupil diameter
-    entrancePupilDiameter = Surface_2.GetCellAt(6).Value;
-    entrancePupilDiameter = 2*str2double(char(entrancePupilDiameter)); % fix data type issues and converting the radius in diameter
-    
-    % 8<--------------------------- Set variables ----------------------------------------------->8
-    
-    % set radius of surface 2 variable
-    Surface_2.RadiusCell.MakeSolveVariable();
-    
-    % set conic constant of surface 2 variable
-    Surface_2.ConicCell.MakeSolveVariable();
-    
-    % set the nPar first aspheric coefficients of surface 2 as variables
-    for j = 2:nPar % Par1 is 2nd order aspheric coefficient, fixed to 0 because conic constant is variable
-        Surface_2_2kThOrderTermCell = Surface_2.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(j)));
-        Solver = Surface_2_2kThOrderTermCell.CreateSolveType(ZOSAPI.Editors.SolveType.Variable);
-        Surface_2_2kThOrderTermCell.SetSolveData(Solver);
-    end
-    
-    % merit function
+    % 8<----------- Build merit function using ray mapping function ----------->8
     
     TheMFE = TheSystem.MFE;
     
-        % ray-mapping
+    % get entrance pupil diameter
+    entrancePupilDiameter = Surface_2.GetCellAt(6).Value;
+    entrancePupilDiameter = 2*str2double(char(entrancePupilDiameter)); % fix data type issues and converting the radius in diameter    
+    
+    % ray-maping function targets computation
     for j = 1:sample
         
         Operand_j = TheMFE.InsertNewOperandAt(j);
@@ -162,91 +148,113 @@ import ZOSAPI.*;
         
         Operand_1_PyCell = Operand_j.GetCellAt(7);
         Operand_1_PyCell.Value = string(normalizedPupilCoordinate);
-        
     end
     
         % constraints
-        edgeConstraint = TheMFE.InsertNewOperandAt(sample+1);
-        edgeConstraint.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.MNEG);
-        
-        edgeConstraint_Surf1cell = edgeConstraint.GetCellAt(2);
-        edgeConstraint_Surf1cell.IntegerValue = 2;
-        edgeConstraint_Surf2cell = edgeConstraint.GetCellAt(3);
-        edgeConstraint_Surf2cell.IntegerValue = 3;
-        
-        edgeConstraint.Weight = sample;
-        edgeConstraint.Target = 1;
-        
-    % optimize
+    edgeConstraint = TheMFE.InsertNewOperandAt(sample+1);
+    edgeConstraint.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.MNEG);
+
+    edgeConstraint_Surf1cell = edgeConstraint.GetCellAt(2);
+    edgeConstraint_Surf1cell.IntegerValue = 2;
+    edgeConstraint_Surf2cell = edgeConstraint.GetCellAt(3);
+    edgeConstraint_Surf2cell.IntegerValue = 3;
+
+    edgeConstraint.Weight = sample;
+    edgeConstraint.Target = 1;
     
-    tic;
-    LocalOpt = TheSystem.Tools.OpenLocalOptimization();
-    if ~isempty(LocalOpt)
-        LocalOpt.Algorithm = ZOSAPI.Tools.Optimization.OptimizationAlgorithm.DampedLeastSquares;
-        LocalOpt.Cycles = ZOSAPI.Tools.Optimization.OptimizationCycles.Automatic;
-        LocalOpt.NumberOfCores = 8;
-        fprintf('Local Optimization...\n');
-        fprintf('Initial Merit Function %6.3f\n', LocalOpt.InitialMeritFunction);
-        LocalOpt.RunAndWaitForCompletion();
-        fprintf('Final Merit Function %6.3f\n', LocalOpt.CurrentMeritFunction);
-        LocalOpt.Close();
+    % 8<------------------- Define variables parameters --------------------->8
+    
+    % set radius of surface 3 variable
+    Surface_3.RadiusCell.MakeSolveVariable();
+    
+    % set conic constant of surface 3 variable
+    Surface_3.ConicCell.MakeSolveVariable();
+    
+    % loop across nPar: optimization for different number of variables to define Aspheric surface
+    for nPar = 1:nParMax                        
+        % set the nPar first aspheric coefficients of surface 2 as variables
+        for j = 2:nPar % Par1 is 2nd order aspheric coefficient, fixed to 0 because conic constant is variable
+            Surface_3_2kThOrderTermCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(j)));
+            Solver = Surface_3_2kThOrderTermCell.CreateSolveType(ZOSAPI.Editors.SolveType.Variable);
+            Surface_3_2kThOrderTermCell.SetSolveData(Solver);
+        end
+        
+            % optimize
+        LocalOpt = TheSystem.Tools.OpenLocalOptimization();
+        if ~isempty(LocalOpt)
+            LocalOpt.Algorithm = ZOSAPI.Tools.Optimization.OptimizationAlgorithm.DampedLeastSquares;
+            LocalOpt.Cycles = ZOSAPI.Tools.Optimization.OptimizationCycles.Automatic;
+            LocalOpt.NumberOfCores = 8;
+            fprintf('Local Optimization...\n');
+            fprintf('Initial Merit Function %6.3f\n', LocalOpt.InitialMeritFunction);
+            LocalOpt.RunAndWaitForCompletion();
+            fprintf('Final Merit Function %6.3f\n', LocalOpt.CurrentMeritFunction);
+            LocalOpt.Close();
+        end
+        
+            % analyse
+                % analysis 1: spot diagram
+        analysis1 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
+                % change analysis settings
+        analysis1Settings = analysis1.GetSettings();
+        analysis1Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.FalseColor; % make sure to perform this step before saving the settings in a configuration file
+        analysis1Settings.SaveTo(cfg1FileName);
+        analysis1Settings.ModifySettings(cfg1FileName, 'IMA_KRAYS', string(nRays/1000));
+        analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
+
+        analysis1Settings.LoadFrom(cfg1FileName);
+
+        tic;
+        analysis1.Terminate();
+        analysis1.WaitForCompletion();
+        toc;
+        
+                % analysis 2: CrossX
+        analysis2 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
+                % change analysis settings
+        analysis2Settings = analysis2.GetSettings();
+        analysis2Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.CrossX;
+        analysis2Settings.SaveTo(cfg2FileName);
+        analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/1000));
+        analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize));
+        analysis2Settings.LoadFrom(cfg2FileName);
+
+        tic;
+        analysis2.Terminate();
+        analysis2.WaitForCompletion();
+        toc;
+
+        % save results under text file
+        
+        results1FileName = resultDir + ...
+        "spotDiagramAnalisis_" + ...
+        "nPar=" + string(nPar) + ...
+        ".txt";
+        results2FileName = resultDir + ...
+        "crossX" + ...
+        "nPar=" + string(nPar) + ...
+        ".txt";
+        
+        results1 = analysis1.GetResults();
+        results1.GetTextFile(results1FileName);
+        
+        results2 = analysis2.GetResults();
+        results2.GetTextFile(results2FileName);
+
+                
     end
-    toc;
     
-    % analyse
-    
-        % analysis 1: spot diagram
-    analysis1 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
-        % change analysis settings
-    analysis1Settings = analysis1.GetSettings();
-    analysis1Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.SpotDiagram; % make sure to perform this step before saving the settings in a configuration file
-    analysis1Settings.SaveTo(cfg1FileName);
-    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_KRAYS', string(nRays/1000));
-    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
-    
-    analysis1Settings.LoadFrom(cfg1FileName);
-    
-    tic;
-    analysis1.Terminate();
-    analysis1.WaitForCompletion();
-    toc;
-    
-    % save results under text file
-    results1 = analysis1.GetResults();
-    results1.GetTextFile(results1FileName);
-    
-    % read results text file
+    % read results
     
     data1 = readmatrix(results1FileName);
-    
-        % analysis 2: CrossX
-    analysis2 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
-    % change analysis settings
-    analysis2Settings = analysis2.GetSettings();
-    analysis2Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.CrossX;
-    analysis2Settings.SaveTo(cfg2FileName);
-    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/1000));
-    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize));
-    analysis2Settings.LoadFrom(cfg2FileName);
-    
-    tic;
-    analysis2.Terminate();
-    analysis2.WaitForCompletion();
-    toc;
-    
-    % save results under text file
-    
-    results2 = analysis2.GetResults();
-    results2.GetTextFile(results2FileName);
-    
     data2 = readmatrix(results2FileName);
     
     % figures
     
-    figure(1)
-    plot(data1(:,8), data1(:,9), '+')
-    axis equal
-    title("Image plane positional spot diagram")
+%     figure(1)
+%     plot(data1(:,8), data1(:,9), '+')
+%     axis equal
+%     title("Image plane positional spot diagram")
     
     % Uniformity computation across a line (horizontal direction) - tbd
     dataCrossX = data2(:,2);
