@@ -40,7 +40,7 @@ results2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\results2
 
     % system design
 distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet (works with 50)
-apertureAngle = 16.6; % [°] (works with 16.6)
+apertureAngle = 16.6; % [°] half aperture angle (works with 16.6)
 objectSpaceNA = sin(pi/180 * apertureAngle);
 apodizationFactor = 9; %1/(w/(entrancePupilDiameter/2))^2;
 backFocalLength = 70;

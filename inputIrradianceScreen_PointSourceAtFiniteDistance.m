@@ -17,8 +17,8 @@ n=1; % index of refraction
 
 intensity = 1; % [W/sr] intensity of the point source
 
-theta=82; % ° half angle of the maximum cone of light emitted by the LED reaching the input plane 
-distanceLedInputPlane = 6e-3; % [m]
+theta = 16.6; % ° half angle of the maximum cone of light emitted by the LED reaching the input plane 
+distanceLedInputPlane = 50e-3; % [m]
 
 inputPlaneSampling = 100; % nuber of pixels in one pupil diameter
 
