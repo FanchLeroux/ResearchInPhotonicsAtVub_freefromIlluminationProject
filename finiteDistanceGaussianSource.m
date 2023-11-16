@@ -31,7 +31,7 @@ end
 
 function [r] = BeginApplication(TheApplication, ~)
 
-    % 8<------------------------ Define directories and file names ------------------------------>8
+    % 8<----------------- Define directories and file names ----------------->8
 
     dirc = 'D:\moi\vub\researchInPhotonics\zemax\zosApi\'; % directory where the ZEMAX .zos file will be generated
     zemaxFileName = 'inputFiniteDistanceGaussianSource_outputCircularUniformIrradiance.zos';
@@ -41,7 +41,7 @@ function [r] = BeginApplication(TheApplication, ~)
 
     resultDir = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\";
 
-    % 8<---------------------------- Define system parameters ----------------------------------->8
+    % 8<--------------------- Define system parameters ---------------------->8
 
     % wavelength
     lambda = 0.633; % wavelength [um]
@@ -65,7 +65,7 @@ function [r] = BeginApplication(TheApplication, ~)
     apodizationFactor = 9; %1/(w/(entrancePupilDiameter/2))^2;
     backFocalLength = 70;
 
-    % 8<--------------------------- Create Zemax file ---------------------------->8
+    % 8<-------------------------- Create Zemax file ------------------------>8
 
     import ZOSAPI.*;
 
@@ -85,7 +85,7 @@ function [r] = BeginApplication(TheApplication, ~)
 
     TheSystem.SystemData.MaterialCatalogs.AddCatalog('SCHOTT');
 
-    % 8<------------------------- Build analysis tools -------------------------->8
+    % 8<---------------------- Build analysis tools ------------------------->8
 
     % analysis 1: spot diagram
     analysis1 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
@@ -105,12 +105,12 @@ function [r] = BeginApplication(TheApplication, ~)
     analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize));
     analysis2Settings.LoadFrom(cfg2FileName);
 
-    % 8<------------------------ Build results containers ----------------------->8
+    % 8<--------------------- Build results containers ---------------------->8
     
     stdVect = zeros(nParMax,1);
     crossXvect = zeros(nParMax, imageSize);
     
-    % 8<------------------ System explorer parameters --------------------------->8    
+    % 8<------------------ System explorer parameters ----------------------->8    
 
     % Aperture    
     TheSystemData = TheSystem.SystemData;
@@ -124,7 +124,7 @@ function [r] = BeginApplication(TheApplication, ~)
     TheSystemData.Wavelengths.RemoveWavelength(1);
     TheSystemData.Wavelengths.AddWavelength(lambda, 1.0);
 
-    % 8<------------------ Lens data editor parameters -------------------------->8   
+    % 8<------------------ Lens data editor parameters ---------------------->8   
 
     TheLDE = TheSystem.LDE;
     TheLDE.InsertNewSurfaceAt(2);
@@ -150,7 +150,7 @@ function [r] = BeginApplication(TheApplication, ~)
     % set stop
     Surface_2.IsStop = true;
 
-    % 8<------------- Build merit function using ray mapping function ---------->8
+    % 8<----------- Build merit function using ray mapping function --------->8
 
     TheMFE = TheSystem.MFE;
 
@@ -279,20 +279,10 @@ function [r] = BeginApplication(TheApplication, ~)
     figure(1)
     imagesc(data1)
     axis equal
-    title("Image plane irradiance map")
-
-    % Std computation across a line (horizontal direction) - tbd
-    dataCrossX = data2(:,2);
-    figure(2)
-    plot(dataCrossX, '+')
-
-    % std as a fuction of nPar    
-    figure(3)
-    plot(stdVect(2:end), '+')
-    title("std as a fuction of nPar")
+    title("Image plane irradiance map nPar="+"nParMax")
 
     % profile as a fuction of nPar
-    figure(4)
+    figure(2)
     hold on
     legendCell = NaN(1,nParMax-1);
     for nPar = 2:nParMax
@@ -301,10 +291,15 @@ function [r] = BeginApplication(TheApplication, ~)
     end
     legend(string(legendCell))
     title("CrossX irradiance profile as a fuction of nPar")
+    
+    % std as a fuction of nPar    
+    figure(3)
+    plot(stdVect(2:end), '+')
+    title("std as a fuction of nPar")
 
-    % Save and close
+    % 8<--------------------- Save and close Zemax file --------------------->8
+    
     TheSystem.Save();
-
     r = [];
     
 end
