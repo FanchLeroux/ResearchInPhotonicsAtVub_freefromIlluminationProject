@@ -1,89 +1,103 @@
 % fleroux - 10/25/2023
 
 %% main programm
+
 function [ r ] = finiteDistanceGaussianSource( args )
 
-clc; format compact; clear;
+    clc; format compact; clear;
 
-if ~exist('args', 'var')
-    args = [];
-end
-
-% Initialize the OpticStudio connection
-TheApplication = InitConnection();
-if isempty(TheApplication)
-    % failed to initialize a connection
-    r = [];
-else
-    try
-        r = BeginApplication(TheApplication, args);
-        CleanupConnection(TheApplication);
-    catch err
-        CleanupConnection(TheApplication);
-        rethrow(err);
+    if ~exist('args', 'var')
+        args = [];
     end
-end
+
+    % Initialize the OpticStudio connection
+    TheApplication = InitConnection();
+    if isempty(TheApplication)
+        % failed to initialize a connection
+        r = [];
+    else
+        try
+            r = BeginApplication(TheApplication, args);
+            CleanupConnection(TheApplication);
+        catch err
+            CleanupConnection(TheApplication);
+            rethrow(err);
+        end   
+    end
+    
 end
 
 %% body
+
 function [r] = BeginApplication(TheApplication, ~)
 
-% 8<------------------------ Define directories and file names ------------------------------>8
+    % 8<------------------------ Define directories and file names ------------------------------>8
 
-dirc = 'D:\moi\vub\researchInPhotonics\zemax\zosApi\'; % directory where the ZEMAX .zos file will be generated
-zemaxFileName = 'inputFiniteDistanceGaussianSource_outputCircularUniformIrradiance.zos';
+    dirc = 'D:\moi\vub\researchInPhotonics\zemax\zosApi\'; % directory where the ZEMAX .zos file will be generated
+    zemaxFileName = 'inputFiniteDistanceGaussianSource_outputCircularUniformIrradiance.zos';
 
-cfg1FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis1.cfg";
-cfg2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis2.cfg";
+    cfg1FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis1.cfg";
+    cfg2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis2.cfg";
 
-resultDir = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\";
+    resultDir = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\";
 
-% 8<---------------------------- Define system parameters ----------------------------------->8
-
-    % system design
-distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet (works with 50)
-apertureAngle = 16.6; % [°] half aperture angle (works with 16.6)
-objectSpaceNA = sin(pi/180 * apertureAngle);
-apodizationFactor = 9; %1/(w/(entrancePupilDiameter/2))^2;
-backFocalLength = 70;
-
-    % input and output irradiance distributions
-w = 5.0; % gaussian input beam waist [mm]
-k = 25.0; % output beam radius [mm]
+    % 8<---------------------------- Define system parameters ----------------------------------->8
 
     % wavelength
-lambda = 0.633; % wavelength [um]
+    lambda = 0.633; % wavelength [um]
+
+    % input and output irradiance distributions
+    w = 5.0; % gaussian input beam waist [mm]
+    k = 25.0; % output beam radius [mm]
 
     % optimization
-nParMax = 8; % number of aspheric coefficients set as variables
-sample = 100; % pupil sampling for the ray-mapping function targets computations
+    nParMax = 8; % number of aspheric coefficients set as variables
+    sample = 100; % pupil sampling for the ray-mapping function targets computations
 
     % analysis
-nRays = 5000000; % number of rays for geometrical image analysis (typical: 5000000)
-imageSize = 100; % image size for geometrical image analysis
+    nRays = 5000000; % number of rays for geometrical image analysis (typical: 5000000)
+    imageSize = 100; % image size for geometrical image analysis
 
-% 8<----- ############################################################## ------->8
+    % system start design. note that all surfaces are flat before optimization
+    distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet (works with 50)
+    apertureAngle = 16.6; % [°] half aperture angle (works with 16.6)
+    objectSpaceNA = sin(pi/180 * apertureAngle);
+    apodizationFactor = 9; %1/(w/(entrancePupilDiameter/2))^2;
+    backFocalLength = 70;
 
-import ZOSAPI.*;
-    
+    % 8<--------------------------- Create Zemax file ---------------------------->8
+
+    import ZOSAPI.*;
+
     % creates a new API directory
     apiPath = System.String.Concat(TheApplication.SamplesDir, '\API\Matlab');
     if (exist(char(apiPath), 'dir') == 0) 
         mkdir(char(apiPath)); 
     end
-    
+
     % Set up primary optical system
     TheSystem = TheApplication.PrimarySystem;
-        
+
     % Make new file
     testFile = System.String.Concat(dirc, zemaxFileName);
     TheSystem.New(false);
     TheSystem.SaveAs(testFile);
-    
+
     TheSystem.SystemData.MaterialCatalogs.AddCatalog('SCHOTT');
-    
-% 8<------------------ System explorer parameters --------------------------->8    
-    
+
+    % 8<------------------------- Build analysis tools -------------------------->8
+
+    % analysis 1: spot diagram
+    analysis1 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
+    % change analysis settings
+    analysis1Settings = analysis1.GetSettings();
+    analysis1Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.FalseColor; % make sure to perform this step before saving the settings in a configuration file
+    analysis1Settings.SaveTo(cfg1FileName);
+    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_KRAYS', string(nRays/1000));
+    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
+
+    % 8<------------------ System explorer parameters --------------------------->8    
+
     % Aperture    
     TheSystemData = TheSystem.SystemData;
     TheSystemData.Aperture.ApertureType = ZOSAPI.SystemData.ZemaxApertureType.ObjectSpaceNA;
@@ -91,13 +105,13 @@ import ZOSAPI.*;
     TheSystemData.Aperture.ApodizationType = ZOSAPI.SystemData.ZemaxApodizationType.Gaussian;    
     TheSystemData.Aperture.ApodizationFactor = apodizationFactor;
     TheSystemData.Aperture.SetCurrentGCRSSurf(2); % Set Surface 2 as the Global Coordinate Reference Surface
-    
+
     % Wavelength
     TheSystemData.Wavelengths.RemoveWavelength(1);
     TheSystemData.Wavelengths.AddWavelength(lambda, 1.0);
 
-% 8<------------------ Lens data editor parameters -------------------------->8    
-    
+    % 8<------------------ Lens data editor parameters -------------------------->8   
+
     TheLDE = TheSystem.LDE;
     TheLDE.InsertNewSurfaceAt(2);
     TheLDE.InsertNewSurfaceAt(3);
@@ -105,7 +119,7 @@ import ZOSAPI.*;
     Surface_1 = TheLDE.GetSurfaceAt(1);
     Surface_2 = TheLDE.GetSurfaceAt(2);
     Surface_3 = TheLDE.GetSurfaceAt(3);
-    
+
     Surface_0.Thickness = distanceSourceLens-5; % -5 term because of the dummy surface between the lens and the object
     Surface_1.Thickness = 5.0;
     Surface_1.Comment = 'dummy';
@@ -114,42 +128,42 @@ import ZOSAPI.*;
     Surface_2.Material = 'N-BK7';
     Surface_3.Thickness = backFocalLength;
     Surface_3.Comment = 'rear of lens';      
-    
+
     % set surface 3 type as even aspheric
     SurfaceType_EvenAspheric = Surface_3.GetSurfaceTypeSettings(ZOSAPI.Editors.LDE.SurfaceType.EvenAspheric);
     Surface_3.ChangeType(SurfaceType_EvenAspheric);
-    
+
     % set stop
     Surface_2.IsStop = true;
-    
+
     % 8<----------- Build merit function using ray mapping function ----------->8
-    
+
     TheMFE = TheSystem.MFE;
-    
+
     % get entrance pupil diameter
     entrancePupilDiameter = Surface_2.GetCellAt(6).Value;
     entrancePupilDiameter = 2*str2double(char(entrancePupilDiameter)); % fix data type issues and converting the radius in diameter    
-    
+
     % ray-maping function targets computation
     for j = 1:sample
-        
+
         Operand_j = TheMFE.InsertNewOperandAt(j);
         Operand_j.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.REAY);
         Operand_j.Weight = 1.0;
-        
+
         normalizedPupilCoordinate = j/sample;
         pupilCoordinate = normalizedPupilCoordinate*entrancePupilDiameter/2; % points along the pupil radius
         target = -k*sqrt(1-exp(-2*pupilCoordinate^2/w^2)); % annalytical ray-mapping function for circular uniform illumination from gaussian input
-        
+
         Operand_j.Target = target;
-        
+
         Operand_1_SurfCell = Operand_j.GetCellAt(2);
         Operand_1_SurfCell.IntegerValue = 4;
-        
+
         Operand_1_PyCell = Operand_j.GetCellAt(7);
         Operand_1_PyCell.Value = string(normalizedPupilCoordinate);
     end
-    
+
         % constraints
     edgeConstraint = TheMFE.InsertNewOperandAt(sample+1);
     edgeConstraint.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.MNEG);
@@ -161,15 +175,15 @@ import ZOSAPI.*;
 
     edgeConstraint.Weight = sample;
     edgeConstraint.Target = 1;
-    
+
     % 8<------------------- Define variables parameters --------------------->8
-    
+
     % set radius of surface 3 variable
     Surface_3.RadiusCell.MakeSolveVariable();
-    
+
     % set conic constant of surface 3 variable
     Surface_3.ConicCell.MakeSolveVariable();
-    
+
     % loop across nPar: optimization for different number of variables to define Aspheric surface
     stdVect = zeros(nParMax,1);
     crossXvect = zeros(nParMax, imageSize);
@@ -180,7 +194,7 @@ import ZOSAPI.*;
             Solver = Surface_3_2kThOrderTermCell.CreateSolveType(ZOSAPI.Editors.SolveType.Variable);
             Surface_3_2kThOrderTermCell.SetSolveData(Solver);
         end
-        
+
             % optimize
         LocalOpt = TheSystem.Tools.OpenLocalOptimization();
         if ~isempty(LocalOpt)
@@ -193,16 +207,8 @@ import ZOSAPI.*;
             fprintf('Final Merit Function %6.3f\n', LocalOpt.CurrentMeritFunction);
             LocalOpt.Close();
         end
-        
+
             % analyse
-                % analysis 1: spot diagram
-        analysis1 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
-                % change analysis settings
-        analysis1Settings = analysis1.GetSettings();
-        analysis1Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.FalseColor; % make sure to perform this step before saving the settings in a configuration file
-        analysis1Settings.SaveTo(cfg1FileName);
-        analysis1Settings.ModifySettings(cfg1FileName, 'IMA_KRAYS', string(nRays/1000));
-        analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
 
         analysis1Settings.LoadFrom(cfg1FileName);
 
@@ -210,7 +216,7 @@ import ZOSAPI.*;
         analysis1.Terminate();
         analysis1.WaitForCompletion();
         toc;
-        
+
                 % analysis 2: CrossX
         analysis2 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
                 % change analysis settings
@@ -227,7 +233,7 @@ import ZOSAPI.*;
         toc;
 
         % save results under text file
-        
+
         results1FileName = resultDir + ...
         "falseColorAnalisis_" + ...
         "nPar=" + string(nPar) + ...
@@ -236,57 +242,57 @@ import ZOSAPI.*;
         "crossX_" + ...
         "nPar=" + string(nPar) + ...
         ".txt";
-        
+
         results1 = analysis1.GetResults();
         results1.GetTextFile(results1FileName);
-        
+
         results2 = analysis2.GetResults();
         results2.GetTextFile(results2FileName);
-        
+
         data2 = readmatrix(results2FileName);
         dataCrossX = data2(:,2);
         crossXvect(nPar, :) = dataCrossX;
         standardDeviation = std(dataCrossX(26:75));
         stdVect(nPar) = standardDeviation;
-                
+
     end
-    
+
     % read results
-    
+
     data1 = readmatrix(results1FileName);
     data2 = readmatrix(results2FileName);
-    
+
     % figures
-    
+
     figure(1)
     imagesc(data1)
     axis equal
     title("Image plane irradiance map")
-    
+
     % Std computation across a line (horizontal direction) - tbd
     dataCrossX = data2(:,2);
     figure(2)
     plot(dataCrossX, '+')
-    
+
     % std as a fuction of nPar    
     figure(3)
     plot(stdVect(2:end), '+')
     title("std as a fuction of nPar")
-    
+
     % profile as a fuction of nPar
     figure(4)
     hold on
-    legendCell = [];
+    legendCell = NaN(1,nParMax-1);
     for nPar = 2:nParMax
         plot(crossXvect(nPar,:))
         legendCell(nPar-1)=nPar;
     end
     legend(string(legendCell))
     title("CrossX irradiance profile as a fuction of nPar")
-    
+
     % Save and close
     TheSystem.Save();
-    
+
     r = [];
     
 end
