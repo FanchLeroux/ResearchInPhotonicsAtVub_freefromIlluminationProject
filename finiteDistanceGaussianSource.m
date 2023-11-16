@@ -172,6 +172,7 @@ import ZOSAPI.*;
     
     % loop across nPar: optimization for different number of variables to define Aspheric surface
     stdVect = zeros(nParMax,1);
+    crossXvect = zeros(nParMax, imageSize);
     for nPar = 1:nParMax                        
         % set the nPar first aspheric coefficients of surface 2 as variables
         for j = 2:nPar % Par1 is 2nd order aspheric coefficient, fixed to 0 because conic constant is variable
@@ -243,8 +244,10 @@ import ZOSAPI.*;
         results2.GetTextFile(results2FileName);
         
         data2 = readmatrix(results2FileName);
-        dataCrossX = data2(40:60,2);
-        stdVect(nPar) = std(dataCrossX);
+        dataCrossX = data2(:,2);
+        crossXvect(nPar, :) = dataCrossX;
+        standardDeviation = std(dataCrossX(26:75));
+        stdVect(nPar) = standardDeviation;
                 
     end
     
@@ -265,14 +268,21 @@ import ZOSAPI.*;
     figure(2)
     plot(dataCrossX, '+')
     
-    % std computation
-    standardDeviation = std(dataCrossX(25:76));
-    
-    % std as a fuction of nPar
-    
+    % std as a fuction of nPar    
     figure(3)
-    plot(stdVect, '+')
+    plot(stdVect(2:end), '+')
     title("std as a fuction of nPar")
+    
+    % profile as a fuction of nPar
+    figure(4)
+    hold on
+    legendCell = [];
+    for nPar = 2:nParMax
+        plot(crossXvect(nPar,:))
+        legendCell(nPar-1)=nPar;
+    end
+    legend(string(legendCell))
+    title("CrossX irradiance profile as a fuction of nPar")
     
     % Save and close
     TheSystem.Save();
