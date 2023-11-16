@@ -59,7 +59,7 @@ nParMax = 8; % number of aspheric coefficients set as variables
 sample = 100; % pupil sampling for the ray-mapping function targets computations
 
     % analysis
-nRays = 5000000; % number of rays for geometrical image analysis (typical: 5000000)
+nRays = 5000; % number of rays for geometrical image analysis (typical: 5000000)
 imageSize = 100; % image size for geometrical image analysis
 
 % 8<----- ############################################################## ------->8
@@ -171,6 +171,7 @@ import ZOSAPI.*;
     Surface_3.ConicCell.MakeSolveVariable();
     
     % loop across nPar: optimization for different number of variables to define Aspheric surface
+    stdVect = zeros(nParMax,1);
     for nPar = 1:nParMax                        
         % set the nPar first aspheric coefficients of surface 2 as variables
         for j = 2:nPar % Par1 is 2nd order aspheric coefficient, fixed to 0 because conic constant is variable
@@ -227,11 +228,11 @@ import ZOSAPI.*;
         % save results under text file
         
         results1FileName = resultDir + ...
-        "spotDiagramAnalisis_" + ...
+        "falseColorAnalisis_" + ...
         "nPar=" + string(nPar) + ...
         ".txt";
         results2FileName = resultDir + ...
-        "crossX" + ...
+        "crossX_" + ...
         "nPar=" + string(nPar) + ...
         ".txt";
         
@@ -240,7 +241,10 @@ import ZOSAPI.*;
         
         results2 = analysis2.GetResults();
         results2.GetTextFile(results2FileName);
-
+        
+        data2 = readmatrix(results2FileName);
+        dataCrossX = data2(40:60,2);
+        stdVect(nPar) = std(dataCrossX);
                 
     end
     
@@ -251,19 +255,24 @@ import ZOSAPI.*;
     
     % figures
     
-%     figure(1)
-%     plot(data1(:,8), data1(:,9), '+')
-%     axis equal
-%     title("Image plane positional spot diagram")
+    figure(1)
+    imagesc(data1)
+    axis equal
+    title("Image plane irradiance map")
     
-    % Uniformity computation across a line (horizontal direction) - tbd
+    % Std computation across a line (horizontal direction) - tbd
     dataCrossX = data2(:,2);
     figure(2)
     plot(dataCrossX, '+')
     
     % std computation
-    
     standardDeviation = std(dataCrossX(25:76));
+    
+    % std as a fuction of nPar
+    
+    figure(3)
+    plot(stdVect, '+')
+    title("std as a fuction of nPar")
     
     % Save and close
     TheSystem.Save();
