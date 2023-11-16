@@ -51,7 +51,7 @@ function [r] = BeginApplication(TheApplication, ~)
     k = 25.0; % output beam radius [mm]
 
     % optimization
-    nParMax = 8; % number of aspheric coefficients set as variables
+    nParMax = 6; % number of aspheric coefficients set as variables
     sample = 100; % pupil sampling for the ray-mapping function targets computations
 
     % analysis
@@ -89,13 +89,27 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % analysis 1: spot diagram
     analysis1 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
-    % change analysis settings
     analysis1Settings = analysis1.GetSettings();
     analysis1Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.FalseColor; % make sure to perform this step before saving the settings in a configuration file
     analysis1Settings.SaveTo(cfg1FileName);
     analysis1Settings.ModifySettings(cfg1FileName, 'IMA_KRAYS', string(nRays/1000));
     analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
+    analysis1Settings.LoadFrom(cfg1FileName);
+    
+    % analysis 2: CrossX
+    analysis2 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
+    analysis2Settings = analysis2.GetSettings();
+    analysis2Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.CrossX;
+    analysis2Settings.SaveTo(cfg2FileName);
+    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/1000));
+    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize));
+    analysis2Settings.LoadFrom(cfg2FileName);
 
+    % 8<------------------------ Build results containers ----------------------->8
+    
+    stdVect = zeros(nParMax,1);
+    crossXvect = zeros(nParMax, imageSize);
+    
     % 8<------------------ System explorer parameters --------------------------->8    
 
     % Aperture    
@@ -136,7 +150,7 @@ function [r] = BeginApplication(TheApplication, ~)
     % set stop
     Surface_2.IsStop = true;
 
-    % 8<----------- Build merit function using ray mapping function ----------->8
+    % 8<------------- Build merit function using ray mapping function ---------->8
 
     TheMFE = TheSystem.MFE;
 
@@ -144,7 +158,7 @@ function [r] = BeginApplication(TheApplication, ~)
     entrancePupilDiameter = Surface_2.GetCellAt(6).Value;
     entrancePupilDiameter = 2*str2double(char(entrancePupilDiameter)); % fix data type issues and converting the radius in diameter    
 
-    % ray-maping function targets computation
+    % ray-maping function
     for j = 1:sample
 
         Operand_j = TheMFE.InsertNewOperandAt(j);
@@ -162,9 +176,10 @@ function [r] = BeginApplication(TheApplication, ~)
 
         Operand_1_PyCell = Operand_j.GetCellAt(7);
         Operand_1_PyCell.Value = string(normalizedPupilCoordinate);
+        
     end
 
-        % constraints
+    % constraints
     edgeConstraint = TheMFE.InsertNewOperandAt(sample+1);
     edgeConstraint.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.MNEG);
 
@@ -176,7 +191,7 @@ function [r] = BeginApplication(TheApplication, ~)
     edgeConstraint.Weight = sample;
     edgeConstraint.Target = 1;
 
-    % 8<------------------- Define variables parameters --------------------->8
+    % 8<-------------------- Define variable parameters --------------------->8
 
     % set radius of surface 3 variable
     Surface_3.RadiusCell.MakeSolveVariable();
@@ -185,9 +200,8 @@ function [r] = BeginApplication(TheApplication, ~)
     Surface_3.ConicCell.MakeSolveVariable();
 
     % loop across nPar: optimization for different number of variables to define Aspheric surface
-    stdVect = zeros(nParMax,1);
-    crossXvect = zeros(nParMax, imageSize);
-    for nPar = 1:nParMax                        
+    for nPar = 1:nParMax
+        
         % set the nPar first aspheric coefficients of surface 2 as variables
         for j = 2:nPar % Par1 is 2nd order aspheric coefficient, fixed to 0 because conic constant is variable
             Surface_3_2kThOrderTermCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(j)));
@@ -195,7 +209,9 @@ function [r] = BeginApplication(TheApplication, ~)
             Surface_3_2kThOrderTermCell.SetSolveData(Solver);
         end
 
-            % optimize
+        % 8<-------------------------- Optimization ------------------------->8
+        
+        now = tic();
         LocalOpt = TheSystem.Tools.OpenLocalOptimization();
         if ~isempty(LocalOpt)
             LocalOpt.Algorithm = ZOSAPI.Tools.Optimization.OptimizationAlgorithm.DampedLeastSquares;
@@ -207,33 +223,26 @@ function [r] = BeginApplication(TheApplication, ~)
             fprintf('Final Merit Function %6.3f\n', LocalOpt.CurrentMeritFunction);
             LocalOpt.Close();
         end
-
-            % analyse
-
-        analysis1Settings.LoadFrom(cfg1FileName);
-
-        tic;
+        optimizationTime = toc(now);
+        fprintf('Optimization took %6.4f seconds\n', optimizationTime)
+        
+        % 8<---------------------------- Analysis --------------------------->8
+        
+        now = tic();
         analysis1.Terminate();
         analysis1.WaitForCompletion();
-        toc;
+        analysis1time = toc(now);
+        fprintf('Analysis 1 took %6.4f seconds\n', analysis1time)
 
-                % analysis 2: CrossX
-        analysis2 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
-                % change analysis settings
-        analysis2Settings = analysis2.GetSettings();
-        analysis2Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.CrossX;
-        analysis2Settings.SaveTo(cfg2FileName);
-        analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/1000));
-        analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize));
-        analysis2Settings.LoadFrom(cfg2FileName);
-
-        tic;
+        now = tic();
         analysis2.Terminate();
         analysis2.WaitForCompletion();
-        toc;
-
-        % save results under text file
-
+        analysis2time = toc(now);
+        fprintf('Analysis 2 took %6.4f seconds\n', analysis2time)
+        
+        % 8<------------------------- Save results -------------------------->8
+        
+        % write into text file
         results1FileName = resultDir + ...
         "falseColorAnalisis_" + ...
         "nPar=" + string(nPar) + ...
@@ -241,15 +250,18 @@ function [r] = BeginApplication(TheApplication, ~)
         results2FileName = resultDir + ...
         "crossX_" + ...
         "nPar=" + string(nPar) + ...
-        ".txt";
-
+        ".txt";    
         results1 = analysis1.GetResults();
         results1.GetTextFile(results1FileName);
-
         results2 = analysis2.GetResults();
         results2.GetTextFile(results2FileName);
-
+        
+        % 8<------------------------- Read results -------------------------->8
+        
         data2 = readmatrix(results2FileName);
+        
+        % 8<------------------------- Process results ----------------------->8
+        
         dataCrossX = data2(:,2);
         crossXvect(nPar, :) = dataCrossX;
         standardDeviation = std(dataCrossX(26:75));
