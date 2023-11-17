@@ -50,7 +50,8 @@ function [r] = BeginApplication(TheApplication, ~)
     k = 25.0; % output beam radius [mm]
 
     % optimization
-    highestOrder = 4; % highest order of the polynomial defining the freeform surface
+    highestOrder = 8; % highest order of the polynomial defining the freeform surface
+    scaleFactorNormRadius = 1.1;
     sample = 100; % pupil sampling for the ray-mapping function targets computations
 
     % analysis
@@ -145,14 +146,23 @@ function [r] = BeginApplication(TheApplication, ~)
     Surface_3.Thickness = backFocalLength;
     Surface_3.Comment = 'rear of lens';      
 
+    % set stop
+    Surface_2.IsStop = true;
+    
     % set surface 3 type as extended polynomial
     SurfaceType_ExtendedPolynomial = Surface_3.GetSurfaceTypeSettings(ZOSAPI.Editors.LDE.SurfaceType.ExtendedPolynomial);
     Surface_3.ChangeType(SurfaceType_ExtendedPolynomial);
     Surface3maximumTermCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par13"));
     Surface3maximumTermCell.IntegerValue = int32((highestOrder + 1)*(highestOrder + 2)/2 -1);
+    Surface3normRadiusCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par14"));
+%     Solver = Surface3normRadiusCell.CreateSolveType(ZOSAPI.Editors.SolveType.SurfacePickup);
+%     Solver.S_SurfacePickup_.Surface = 3;
+%     Solver.S_SurfacePickup_.ScaleFactor = scaleFactorNormRadius;
+%     Solver.S_SurfacePickup_.Column = ZOSAPI.Editors.LDE.SurfaceColumn.SemiDiameter;
+%     Surface3normRadiusCell.SetSolveData(Solver)
     
-    % set stop
-    Surface_2.IsStop = true;
+    
+    
 
     % 8<----------- Build merit function using ray mapping function --------->8
 
@@ -204,24 +214,30 @@ function [r] = BeginApplication(TheApplication, ~)
     Surface_3.ConicCell.MakeSolveVariable();
 
     % loop across order: optimization for different number of orders to define freeform surface
-    for order = 4:2:highestOrder % even aspher surface defined by extended polynomial: no order 1 term
+    for order = highestOrder:2:highestOrder % even aspher surface defined by extended polynomial: no order 1 term
         
         % set variables up to order taking into account the symetries of the problem
         for currentOrder = 4:2:order % order 2 corresponds to conic constant and only even orders are considered
+            
             % set X^(currentOrder) as variable
             parNumberXcurrentOrderY0 = 14 + currentOrder*(currentOrder + 1)/2;
             Surface_3XcurrentOrderY0 = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumberXcurrentOrderY0)));
             Solver = Surface_3XcurrentOrderY0.CreateSolveType(ZOSAPI.Editors.SolveType.Variable);
             Surface_3XcurrentOrderY0.SetSolveData(Solver);
+            
             % add pickups to exploits symetries
-            parNumber = 26;
-            scaleFactor = 2;
-            Surface_3currentCrossTermCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumber)));
-            Solver = Surface_3currentCrossTermCell.CreateSolveType(ZOSAPI.Editors.SolveType.SurfacePickup);
-            Solver.S_SurfacePickup_.Surface = 3;
-            Solver.S_SurfacePickup_.ScaleFactor = scaleFactor;
-            Solver.S_SurfacePickup_.Column = ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumberXcurrentOrderY0));
-            Surface_3currentCrossTermCell.SetSolveData(Solver)
+            for yOrder = 2:2:currentOrder
+                
+                parNumber = parNumberXcurrentOrderY0 + yOrder;
+                scaleFactor = nchoosek(currentOrder/2, yOrder/2);
+                Surface_3currentCrossTermCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumber)));
+                Solver = Surface_3currentCrossTermCell.CreateSolveType(ZOSAPI.Editors.SolveType.SurfacePickup);
+                Solver.S_SurfacePickup_.Surface = 3;
+                Solver.S_SurfacePickup_.ScaleFactor = scaleFactor;
+                Solver.S_SurfacePickup_.Column = ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumberXcurrentOrderY0));
+                Surface_3currentCrossTermCell.SetSolveData(Solver)
+                
+            end
             
         end        
         
@@ -286,19 +302,17 @@ function [r] = BeginApplication(TheApplication, ~)
     end
     
     % add 3D layout
-    
     now = tic();
-    analysis3.ApplyAndWaitForCompletion()
+    analysis3.ApplyAndWaitForCompletion();
     analysis3time = toc(now);
     fprintf('Analysis 3 took %6.4f seconds\n', analysis3time)
 
     % read results
-
     data1 = readmatrix(results1FileName);
-    data2 = readmatrix(results2FileName);
 
-    % figures
-
+    % 8<------------------------------ Figures ------------------------------>8
+    
+    % irradiance map
     figure(1)
     imagesc(data1)
     axis equal
