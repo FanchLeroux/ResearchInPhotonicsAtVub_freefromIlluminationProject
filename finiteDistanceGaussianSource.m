@@ -33,13 +33,12 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % 8<----------------- Define directories and file names ----------------->8
 
-    dirc = 'D:\moi\vub\researchInPhotonics\zemax\zosApi\'; % directory where the ZEMAX .zos file will be generated
-    zemaxFileName = 'inputFiniteDistanceGaussianSource_outputCircularUniformIrradiance.zos';
-
-    cfg1FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis1.cfg";
-    cfg2FileName = "D:\moi\vub\researchInPhotonics\zemax\zosApi\config\geometricImageAnalysis2.cfg";
-
-    resultDir = "D:\moi\vub\researchInPhotonics\zemax\zosApi\results\";
+    dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\"; % directory where the ZEMAX .zos file will be generated
+    resultDir = dirc + "results\";
+    
+    zemaxFileName = dirc + "inputFiniteDistanceGaussianSource_outputCircularUniformIrradiance.zos";    
+    cfg1FileName = dirc + "config\geometricImageAnalysis1.cfg";
+    cfg2FileName = dirc + "config\geometricImageAnalysis2.cfg";
 
     % 8<--------------------- Define system parameters ---------------------->8
 
@@ -79,7 +78,7 @@ function [r] = BeginApplication(TheApplication, ~)
     TheSystem = TheApplication.PrimarySystem;
 
     % Make new file
-    testFile = System.String.Concat(dirc, zemaxFileName);
+    testFile = zemaxFileName;
     TheSystem.New(false);
     TheSystem.SaveAs(testFile);
 
@@ -96,7 +95,7 @@ function [r] = BeginApplication(TheApplication, ~)
     analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
     analysis1Settings.LoadFrom(cfg1FileName);
     
-    % analysis 2: CrossX
+    % analysis 2: crossX
     analysis2 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
     analysis2Settings = analysis2.GetSettings();
     analysis2Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.CrossX;
@@ -104,6 +103,9 @@ function [r] = BeginApplication(TheApplication, ~)
     analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/1000));
     analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize));
     analysis2Settings.LoadFrom(cfg2FileName);
+    
+    % analysis 3: 3D layout    
+    analysis3 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.Draw3D);
 
     % 8<--------------------- Build results containers ---------------------->8
     
@@ -268,6 +270,13 @@ function [r] = BeginApplication(TheApplication, ~)
         stdVect(nPar) = standardDeviation;
 
     end
+    
+    % add 3D layout
+    
+    now = tic();
+    analysis3.ApplyAndWaitForCompletion()
+    analysis3time = toc(now);
+    fprintf('Analysis 3 took %6.4f seconds\n', analysis3time)
 
     % read results
 
@@ -369,5 +378,3 @@ function  CleanupConnection(TheApplication)
 % and store the instance somewhere instead.
 TheApplication.CloseApplication();
 end
-
-
