@@ -50,7 +50,7 @@ function [r] = BeginApplication(TheApplication, ~)
     k = 25.0; % output beam radius [mm]
 
     % optimization
-    highestOrder = 6; % highest order of the polynomial defining the freeform surface
+    highestOrder = 4; % highest order of the polynomial defining the freeform surface
     sample = 100; % pupil sampling for the ray-mapping function targets computations
 
     % analysis
@@ -209,12 +209,22 @@ function [r] = BeginApplication(TheApplication, ~)
         % set variables up to order taking into account the symetries of the problem
         for currentOrder = 4:2:order % order 2 corresponds to conic constant and only even orders are considered
             % set X^(currentOrder) as variable
-            parNumber = 14 + currentOrder*(currentOrder + 1)/2;
-            Surface_3_XcurrentOrderY0 = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumber)));
-            Solver = Surface_3_XcurrentOrderY0.CreateSolveType(ZOSAPI.Editors.SolveType.Variable);
-            Surface_3_XcurrentOrderY0.SetSolveData(Solver);
-        end
-
+            parNumberXcurrentOrderY0 = 14 + currentOrder*(currentOrder + 1)/2;
+            Surface_3XcurrentOrderY0 = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumberXcurrentOrderY0)));
+            Solver = Surface_3XcurrentOrderY0.CreateSolveType(ZOSAPI.Editors.SolveType.Variable);
+            Surface_3XcurrentOrderY0.SetSolveData(Solver);
+            % add pickups to exploits symetries
+            parNumber = 26;
+            scaleFactor = 2;
+            Surface_3currentCrossTermCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumber)));
+            Solver = Surface_3currentCrossTermCell.CreateSolveType(ZOSAPI.Editors.SolveType.SurfacePickup);
+            Solver.S_SurfacePickup_.Surface = 3;
+            Solver.S_SurfacePickup_.ScaleFactor = scaleFactor;
+            Solver.S_SurfacePickup_.Column = ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumberXcurrentOrderY0));
+            Surface_3currentCrossTermCell.SetSolveData(Solver)
+            
+        end        
+        
         % 8<-------------------------- Optimization ------------------------->8
         
         now = tic();
