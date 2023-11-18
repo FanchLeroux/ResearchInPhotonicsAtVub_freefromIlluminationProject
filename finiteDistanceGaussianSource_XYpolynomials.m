@@ -50,10 +50,10 @@ function [r] = BeginApplication(TheApplication, ~)
     k = 25.0; % output beam radius [mm]
 
     % optimization
-    optimize = 0; % [bool] choose to perform or not local optimization
-    highestOrder = 8; % highest order of the polynomial defining the freeform surface
-    scaleFactorNormRadius = 1.1; % factor used to define the normalization radius of surface 3 from the radius of surface 2
-    sample = 100; % pupil sampling for the ray-mapping function targets computations
+    optimize = 1; % [bool] choose to perform or not local optimization
+    highestOrder = 20; % highest order of the polynomial defining the freeform surface
+    scaleFactorNormRadius = 1.2; % factor used to define the normalization radius of surface 3 from the radius of surface 2
+    sample = 500; % pupil sampling for the ray-mapping function targets computations
 
     % analysis
     nRays = 5000000; % number of rays for geometrical image analysis (typical: 5000000)
@@ -111,8 +111,8 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % 8<--------------------- Build results containers ---------------------->8
     
-    stdVect = zeros(highestOrder,1);
-    crossXvect = zeros(highestOrder, imageSize);
+    stdVect = zeros(highestOrder/2,1);
+    crossXvect = zeros(highestOrder/2, imageSize);
     
     % 8<------------------ System explorer parameters ----------------------->8    
 
@@ -148,7 +148,10 @@ function [r] = BeginApplication(TheApplication, ~)
     Surface_3.Comment = 'rear of lens';      
 
     % set stop
-    Surface_2.IsStop = true;
+    Surface_3.IsStop = true;
+    
+    % set GCRS
+    TheSystemData.Aperture.SetCurrentGCRSSurf(3); % Set Surface 3 as the Global Coordinate Reference Surface
     
     % set surface 3 type as extended polynomial
     SurfaceType_ExtendedPolynomial = Surface_3.GetSurfaceTypeSettings(ZOSAPI.Editors.LDE.SurfaceType.ExtendedPolynomial);
@@ -156,11 +159,8 @@ function [r] = BeginApplication(TheApplication, ~)
     Surface3maximumTermCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par13"));
     Surface3maximumTermCell.IntegerValue = int32((highestOrder + 1)*(highestOrder + 2)/2 -1);
     Surface3normRadiusCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par14"));
-%     Solver = Surface3normRadiusCell.CreateSolveType(ZOSAPI.Editors.SolveType.SurfacePickup);
-%     Solver.S_SurfacePickup_.Surface = 3;
-%     Solver.S_SurfacePickup_.ScaleFactor = scaleFactorNormRadius;
-%     Solver.S_SurfacePickup_.Column = ZOSAPI.Editors.LDE.SurfaceColumn.SemiDiameter;
-%     Surface3normRadiusCell.SetSolveData(Solver)
+    Surface3normRadiusCell.DoubleValue = Surface_3.SemiDiameter * scaleFactorNormRadius;
+
     
     
     
@@ -189,8 +189,8 @@ function [r] = BeginApplication(TheApplication, ~)
         Operand_1_SurfCell = Operand_j.GetCellAt(2);
         Operand_1_SurfCell.IntegerValue = 4;
 
-        Operand_1_PyCell = Operand_j.GetCellAt(6);
-        Operand_1_PyCell.Value = string(normalizedPupilCoordinate);
+        Operand_1_PxCell = Operand_j.GetCellAt(6);
+        Operand_1_PxCell.Value = string(normalizedPupilCoordinate);
         
     end
 
@@ -215,7 +215,7 @@ function [r] = BeginApplication(TheApplication, ~)
     Surface_3.ConicCell.MakeSolveVariable();
 
     % loop across order: optimization for different number of orders to define freeform surface
-    for order = highestOrder:2:highestOrder % even aspher surface defined by extended polynomial: no order 1 term
+    for order = 4:2:highestOrder % even aspher surface defined by extended polynomial: no order 1 term
         
         % set variables up to order taking into account the symetries of the problem
         for currentOrder = 4:2:order % order 2 corresponds to conic constant and only even orders are considered
@@ -304,9 +304,9 @@ function [r] = BeginApplication(TheApplication, ~)
         % 8<------------------------- Process results ----------------------->8
         
         dataCrossX = data2(:,2);
-        crossXvect(order, :) = dataCrossX;
+        crossXvect(order/2, :) = dataCrossX;
         standardDeviation = std(dataCrossX(26:75));
-        stdVect(order) = standardDeviation;
+        stdVect(order/2) = standardDeviation;
 
     end
     
@@ -331,8 +331,8 @@ function [r] = BeginApplication(TheApplication, ~)
     figure(2)
     hold on
     legendCell = NaN(1,highestOrder-1);
-    for order = 2:highestOrder
-        plot(crossXvect(order,:))
+    for order = 2:2:highestOrder
+        plot(crossXvect(order/2,:))
         legendCell(order-1)=order;
     end
     legend(string(legendCell))
@@ -340,7 +340,7 @@ function [r] = BeginApplication(TheApplication, ~)
     
     % std as a fuction of order    
     figure(3)
-    plot(stdVect(2:end), '+')
+    plot(4:2:highestOrder,stdVect(2:end), '-+')
     title("std as a fuction of order")
 
     % 8<--------------------- Save and close Zemax file --------------------->8
