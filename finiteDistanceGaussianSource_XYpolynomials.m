@@ -50,8 +50,9 @@ function [r] = BeginApplication(TheApplication, ~)
     k = 25.0; % output beam radius [mm]
 
     % optimization
+    optimize = 0; % [bool] choose to perform or not local optimization
     highestOrder = 8; % highest order of the polynomial defining the freeform surface
-    scaleFactorNormRadius = 1.1;
+    scaleFactorNormRadius = 1.1; % factor used to define the normalization radius of surface 3 from the radius of surface 2
     sample = 100; % pupil sampling for the ray-mapping function targets computations
 
     % analysis
@@ -243,20 +244,28 @@ function [r] = BeginApplication(TheApplication, ~)
         
         % 8<-------------------------- Optimization ------------------------->8
         
-        now = tic();
-        LocalOpt = TheSystem.Tools.OpenLocalOptimization();
-        if ~isempty(LocalOpt)
-            LocalOpt.Algorithm = ZOSAPI.Tools.Optimization.OptimizationAlgorithm.DampedLeastSquares;
-            LocalOpt.Cycles = ZOSAPI.Tools.Optimization.OptimizationCycles.Automatic;
-            LocalOpt.NumberOfCores = 8;
-            fprintf('Local Optimization...\n');
-            fprintf('Initial Merit Function %6.3f\n', LocalOpt.InitialMeritFunction);
-            LocalOpt.RunAndWaitForCompletion();
-            fprintf('Final Merit Function %6.3f\n', LocalOpt.CurrentMeritFunction);
-            LocalOpt.Close();
+        if optimize
+            
+            now = tic();
+            LocalOpt = TheSystem.Tools.OpenLocalOptimization();
+            
+            if ~isempty(LocalOpt)
+                
+                LocalOpt.Algorithm = ZOSAPI.Tools.Optimization.OptimizationAlgorithm.DampedLeastSquares;
+                LocalOpt.Cycles = ZOSAPI.Tools.Optimization.OptimizationCycles.Automatic;
+                LocalOpt.NumberOfCores = 8;
+                fprintf('Local Optimization...\n');
+                fprintf('Initial Merit Function %6.3f\n', LocalOpt.InitialMeritFunction);
+                LocalOpt.RunAndWaitForCompletion();
+                fprintf('Final Merit Function %6.3f\n', LocalOpt.CurrentMeritFunction);
+                LocalOpt.Close();
+                
+            end
+            
+            optimizationTime = toc(now);
+            fprintf('Optimization took %6.4f seconds\n', optimizationTime)
+            
         end
-        optimizationTime = toc(now);
-        fprintf('Optimization took %6.4f seconds\n', optimizationTime)
         
         % 8<---------------------------- Analysis --------------------------->8
         
