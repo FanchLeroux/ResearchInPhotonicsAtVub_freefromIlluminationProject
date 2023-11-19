@@ -51,21 +51,35 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % optimization
     optimize = 1; % [bool] choose to perform or not local optimization
-    highestOrder = 20; % highest order of the polynomial defining the freeform surface
+    highestOrder = 20; % (timeConsuming) highest order of the polynomial defining the freeform surface
     scaleFactorNormRadius = 1.2; % factor used to define the normalization radius of surface 3 from the radius of surface 2
-    sample = 500; % pupil sampling for the ray-mapping function targets computations
+    sample = 500; % (timeConsuming) pupil sampling for the ray-mapping function targets computations
 
     % analysis
-    nRays = 5000000; % number of rays for geometrical image analysis (typical: 5000000)
+    nRays = 5000000; % (timeConsuming) number of rays for geometrical image analysis (typical: 5000000)
     imageSize = 100; % image size for geometrical image analysis
+    imagePixel = 100; % (timeConsuming) number of pixels across the diameter
 
     % system start design. note that all surfaces are flat before optimization
     distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet (works with 50)
     apertureAngle = 16.6; % [°] half aperture angle (works with 16.6)
     objectSpaceNA = sin(pi/180 * apertureAngle);
-    apodizationFactor = 9; %1/(w/(entrancePupilDiameter/2))^2;
+    apodizationFactor = 9; % 1/(w/(entrancePupilDiameter/2))^2;
     backFocalLength = 70;
+    
+    % 8<----------------------- Am I debugging ? ---------------------------->8
 
+    debug = 0;
+    
+    if debug
+        
+        highestOrder = 4; % (timeConsuming) highest order of the polynomial defining the freeform surface
+        sample = 10; % (timeConsuming) pupil sampling for the ray-mapping function targets computations
+        nRays = 1000; % (timeConsuming) number of rays for geometrical image analysis (typical: 5000000)
+        %imagePixel = 10; % (timeConsuming) number of pixels across the diameter
+        
+    end
+        
     % 8<-------------------------- Create Zemax file ------------------------>8
 
     import ZOSAPI.*;
@@ -94,7 +108,7 @@ function [r] = BeginApplication(TheApplication, ~)
     analysis1Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.FalseColor; % make sure to perform this step before saving the settings in a configuration file
     analysis1Settings.SaveTo(cfg1FileName);
     analysis1Settings.ModifySettings(cfg1FileName, 'IMA_KRAYS', string(nRays/1000));
-    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
+    %analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
     analysis1Settings.LoadFrom(cfg1FileName);
     
     % analysis 2: crossX
@@ -104,6 +118,7 @@ function [r] = BeginApplication(TheApplication, ~)
     analysis2Settings.SaveTo(cfg2FileName);
     analysis2Settings.ModifySettings(cfg2FileName, 'IMA_KRAYS', string(nRays/1000));
     analysis2Settings.ModifySettings(cfg2FileName, 'IMA_IMAGESIZE', string(imageSize));
+    analysis2Settings.ModifySettings(cfg2FileName, 'IMA_PIXELS', string(imagePixel));
     analysis2Settings.LoadFrom(cfg2FileName);
     
     % analysis 3: 3D layout    
@@ -112,7 +127,7 @@ function [r] = BeginApplication(TheApplication, ~)
     % 8<--------------------- Build results containers ---------------------->8
     
     stdVect = zeros(highestOrder/2,1);
-    crossXvect = zeros(highestOrder/2, imageSize);
+    crossXvect = zeros(highestOrder/2, imagePixel);
     
     % 8<------------------ System explorer parameters ----------------------->8    
 
