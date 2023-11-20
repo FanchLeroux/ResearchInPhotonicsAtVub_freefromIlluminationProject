@@ -51,11 +51,11 @@ function [r] = BeginApplication(TheApplication, ~)
     yExtent = 25.0; % output beam y-extent [mm]
 
     % optimization
-    optimize = 0; % [bool] choose to perform or not local optimization
-    highestOrder = 10; % (timeConsuming) highest order of the polynomial defining the freeform surface
+    optimize = 1; % [bool] choose to perform or not local optimization
+    highestOrder = 20; % (timeConsuming) highest order of the polynomial defining the freeform surface
     lowerOrder = 4; % >= 4 lower order of the polynomial defining the freeform surface
     scaleFactorNormRadius = 1.2; % factor used to define the normalization radius of surface 3 from the radius of surface 2
-    sample = 50; % (timeConsuming) pupil sampling for the ray-mapping function targets computations
+    sample = 100; % (timeConsuming) pupil sampling for the ray-mapping function targets computations
 
     % analysis
     nRays = 5000000; % (timeConsuming) number of rays for geometrical image analysis (typical: 5000000)
@@ -383,10 +383,10 @@ function [r] = BeginApplication(TheApplication, ~)
     % profile as a fuction of order
     figure(2)
     hold on
-    legendCell = NaN(1,highestOrder-1);
+    legendCell = NaN(1,highestOrder/2);
     for order = 2:2:highestOrder
         plot(crossXvect(order/2,:))
-        legendCell(order-1)=order;
+        legendCell(order/2)=order;
     end
     legend(string(legendCell))
     title("CrossX irradiance profile as a fuction of order")
