@@ -33,8 +33,9 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % 8<----------------- Define directories and file names ----------------->8
 
-    dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\lambertianPointSource\circularTopHat\"; % directory where the ZEMAX .zos file will be generated
+    dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\lambertianPointSource\circularTopHat\";
     resultDir = dirc + "results\";
+    rayMappingFunctionDir = dirc + "rayMappingFunctions\fromAlejandro20231120\";
     
     zemaxFileName = dirc + "finiteDistanceLambertianSource2circularTopHat_XYpolynomials_r.zos";    
     cfg1FileName = dirc + "config\geometricImageAnalysis1.cfg";
@@ -45,17 +46,15 @@ function [r] = BeginApplication(TheApplication, ~)
     % wavelength
     lambda = 0.633; % wavelength [um]
 
-    % input and output irradiance distributions
-    w = 5.0; % gaussian input beam waist [mm]
+    % desired output irradiance distributions
     xExtent = 25.0; % output beam x-extent [mm]
     yExtent = 25.0; % output beam y-extent [mm]
 
     % optimization
     optimize = 1; % [bool] choose to perform or not local optimization
-    highestOrder = 4; % (timeConsuming) highest order of the polynomial defining the freeform surface
+    highestOrder = 14; % (timeConsuming) highest order of the polynomial defining the freeform surface
     lowerOrder = 4; % >= 4 lower order of the polynomial defining the freeform surface
     scaleFactorNormRadius = 1.2; % factor used to define the normalization radius of surface 3 from the radius of surface 2
-    sample = 100; % (timeConsuming) pupil sampling for the ray-mapping function targets computations
 
     % analysis
     nRays = 5000000; % (timeConsuming) number of rays for geometrical image analysis (typical: 5000000)
@@ -66,7 +65,6 @@ function [r] = BeginApplication(TheApplication, ~)
     distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet (works with 50)
     apertureAngle = 16.6; % [°] half aperture angle (works with 16.6)
     objectSpaceNA = sin(pi/180 * apertureAngle);
-    apodizationFactor = 9; % 1/(w/(entrancePupilDiameter/2))^2;
     backFocalLength = 70;
     
     % 8<----------------------- Am I debugging ? ---------------------------->8
@@ -104,13 +102,13 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % 8<---------------------- Build analysis tools ------------------------->8
 
-    % analysis 1: spot diagram
+    % analysis 1: 2D irradiance map
     analysis1 = TheSystem.Analyses.New_Analysis(ZOSAPI.Analysis.AnalysisIDM.GeometricImageAnalysis);
     analysis1Settings = analysis1.GetSettings();
     analysis1Settings.ShowAs = ZOSAPI.Analysis.GiaShowAsTypes.FalseColor; % make sure to perform this step before saving the settings in a configuration file
     analysis1Settings.SaveTo(cfg1FileName);
     analysis1Settings.ModifySettings(cfg1FileName, 'IMA_KRAYS', string(nRays/1000));
-    %analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
+    analysis1Settings.ModifySettings(cfg1FileName, 'IMA_IMAGESIZE', string(imageSize));
     analysis1Settings.LoadFrom(cfg1FileName);
     
     % analysis 2: crossX
@@ -137,8 +135,7 @@ function [r] = BeginApplication(TheApplication, ~)
     TheSystemData = TheSystem.SystemData;
     TheSystemData.Aperture.ApertureType = ZOSAPI.SystemData.ZemaxApertureType.ObjectSpaceNA;
     TheSystemData.Aperture.ApertureValue = objectSpaceNA;
-    TheSystemData.Aperture.ApodizationType = ZOSAPI.SystemData.ZemaxApodizationType.Gaussian;    
-    TheSystemData.Aperture.ApodizationFactor = apodizationFactor;
+    TheSystemData.Aperture.ApodizationType = ZOSAPI.SystemData.ZemaxApodizationType.CosineCubed;    
     TheSystemData.Aperture.SetCurrentGCRSSurf(2); % Set Surface 2 as the Global Coordinate Reference Surface
 
     % Wavelength
@@ -178,6 +175,15 @@ function [r] = BeginApplication(TheApplication, ~)
     Surface3normRadiusCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par14"));
     Surface3normRadiusCell.DoubleValue = Surface_3.SemiDiameter * scaleFactorNormRadius;
 
+    % 8<------------------- Import ray mapping function --------------------->8
+    
+    load(rayMappingFunctionDir+"M1.mat", "M1");
+    load(rayMappingFunctionDir+"ZM1.mat", "ZM1");
+    load(rayMappingFunctionDir+"M2.mat", "M2");
+    load(rayMappingFunctionDir+"ZM2.mat", "ZM2");
+    load(rayMappingFunctionDir+"Zx.mat", "Zx");
+    load(rayMappingFunctionDir+"Zy.mat", "Zy");
+    
     % 8<----------- Build merit function using ray mapping function --------->8
 
     TheMFE = TheSystem.MFE;
@@ -187,68 +193,53 @@ function [r] = BeginApplication(TheApplication, ~)
     entrancePupilDiameter = 2*str2double(char(entrancePupilDiameter)); % fix data type issues and converting the radius in diameter    
 
     % ray-maping function
-    operandNumber = 1;
-    for x = 1:sample
+    
+    % REAY
+    for j = 1:size(ZM1,1)
+                        
+        Operand = TheMFE.InsertNewOperandAt(j);
         
-        for y = 1:sample
+        Operand.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.REAY);
+        
+        Operand_SurfCell = Operand.GetCellAt(2);
+        Operand_SurfCell.IntegerValue = 4;
+        
+        Operand_PxCell = Operand.GetCellAt(6);
+        Operand_PxCell.Value = string(Zx(j));
+        
+        Operand_PyCell = Operand.GetCellAt(7);
+        Operand_PyCell.Value = string(Zy(j));
             
-            normalizedPupilCoordinateX = x/sample;
-            normalizedPupilCoordinateY = y/sample;
+        Operand.Target = yExtent * ZM2(j);
+        
+        Operand.Weight = 1.0;
             
-            % avoid considering points outside the pupil
-            if normalizedPupilCoordinateX^2 + normalizedPupilCoordinateY^2 >1
-                break
-            end                        
+    end
+    
+    % REAY
+    for j = 1:size(ZM1,1)
             
-            % REAX
-            pupilCoordinateX = normalizedPupilCoordinateX*entrancePupilDiameter/2;
-            
-            OperandX = TheMFE.InsertNewOperandAt(operandNumber);
-            
-            OperandX.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.REAX);
-            
-            OperandX_SurfCell = OperandX.GetCellAt(2);
-            OperandX_SurfCell.IntegerValue = 4;
-            
-            OperandX_PxCell = OperandX.GetCellAt(6);
-            OperandX_PxCell.Value = string(normalizedPupilCoordinateX);
-            OperandX_PyCell = OperandX.GetCellAt(7);
-            OperandX_PyCell.Value = string(normalizedPupilCoordinateY);
-            
-            targetX = xExtent * erf(sqrt(2)*pupilCoordinateX/w); % annalytical ray-mapping function for rectangular uniform illumination from gaussian input
-            OperandX.Target = targetX;
-
-            OperandX.Weight = 1.0;
-            
-            % REAY
-            pupilCoordinateY = normalizedPupilCoordinateY*entrancePupilDiameter/2;
-            
-            OperandY = TheMFE.InsertNewOperandAt(operandNumber + 1);
-
-            OperandY.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.REAY);
-            
-            OperandY_SurfCell = OperandY.GetCellAt(2);
-            OperandY_SurfCell.IntegerValue = 4;
-            
-            OperandY_PxCell = OperandY.GetCellAt(6);
-            OperandY_PxCell.Value = string(normalizedPupilCoordinateX);
-            OperandY_PyCell = OperandY.GetCellAt(7);
-            OperandY_PyCell.Value = string(normalizedPupilCoordinateY);
-            
-            targetY = yExtent * erf(sqrt(2)*pupilCoordinateY/w); % annalytical ray-mapping function for rectangular uniform illumination from gaussian input
-            OperandY.Target = targetY;
-
-            OperandY.Weight = 1.0;
-
-            % increase operandNumber
-            operandNumber = operandNumber + 2;
-            
-        end
+        Operand = TheMFE.InsertNewOperandAt(size(ZM1,1) + j);
+        
+        Operand.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.REAX);
+        
+        Operand_SurfCell = Operand.GetCellAt(2);
+        Operand_SurfCell.IntegerValue = 4;
+        
+        Operand_PxCell = Operand.GetCellAt(6);
+        Operand_PxCell.Value = string(Zx(j));
+        
+        Operand_PyCell = Operand.GetCellAt(7);
+        Operand_PyCell.Value = string(Zy(j));
+        
+        Operand.Target = xExtent * ZM1(j);
+        
+        Operand.Weight = 1.0;
         
     end
 
     % constraints
-    edgeConstraint = TheMFE.InsertNewOperandAt(sample+1);
+    edgeConstraint = TheMFE.InsertNewOperandAt(2*size(ZM1,1)+1);
     edgeConstraint.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.MNEG);
 
     edgeConstraint_Surf1cell = edgeConstraint.GetCellAt(2);
@@ -256,7 +247,7 @@ function [r] = BeginApplication(TheApplication, ~)
     edgeConstraint_Surf2cell = edgeConstraint.GetCellAt(3);
     edgeConstraint_Surf2cell.IntegerValue = 3;
 
-    edgeConstraint.Weight = sample;
+    edgeConstraint.Weight = 2 * size(ZM1,1);
     edgeConstraint.Target = 1;
 
     % 8<-------------------- Define variable parameters --------------------->8
