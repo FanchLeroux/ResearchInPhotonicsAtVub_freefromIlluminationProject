@@ -33,7 +33,7 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % 8<----------------- Define directories and file names ----------------->8
 
-    dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\circularTopHat\"; % directory where the ZEMAX .zos file will be generated
+    dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\lambertianPointSource\circularTopHat\"; % directory where the ZEMAX .zos file will be generated
     resultDir = dirc + "results\";
     
     zemaxFileName = dirc + "XYpolynomials_inputFiniteDistanceGaussianSource_outputCircularUniformIrradiance.zos";    

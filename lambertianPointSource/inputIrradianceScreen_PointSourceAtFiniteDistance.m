@@ -9,7 +9,7 @@ clear; clc; format compact
 % output plane, and perform a freeform lens optimization based on this
 % ray-mapping function.
 
-dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\circularTopHat\results\";
+dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\lambertianPointSource\inputIrradianceMaps\";
 
 % Parameters
 
