@@ -47,13 +47,15 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % input and output irradiance distributions
     w = 5.0; % gaussian input beam waist [mm]
-    k = 25.0; % output beam radius [mm]
+    xExtent = 25.0; % output beam x-extent [mm]
+    yExtent = 25.0; % output beam y-extent [mm]
 
     % optimization
-    optimize = 1; % [bool] choose to perform or not local optimization
-    highestOrder = 20; % (timeConsuming) highest order of the polynomial defining the freeform surface
+    optimize = 0; % [bool] choose to perform or not local optimization
+    highestOrder = 10; % (timeConsuming) highest order of the polynomial defining the freeform surface
+    lowerOrder = 4; % >= 4 lower order of the polynomial defining the freeform surface
     scaleFactorNormRadius = 1.2; % factor used to define the normalization radius of surface 3 from the radius of surface 2
-    sample = 500; % (timeConsuming) pupil sampling for the ray-mapping function targets computations
+    sample = 50; % (timeConsuming) pupil sampling for the ray-mapping function targets computations
 
     % analysis
     nRays = 5000000; % (timeConsuming) number of rays for geometrical image analysis (typical: 5000000)
@@ -176,10 +178,6 @@ function [r] = BeginApplication(TheApplication, ~)
     Surface3normRadiusCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par14"));
     Surface3normRadiusCell.DoubleValue = Surface_3.SemiDiameter * scaleFactorNormRadius;
 
-    
-    
-    
-
     % 8<----------- Build merit function using ray mapping function --------->8
 
     TheMFE = TheSystem.MFE;
@@ -189,23 +187,63 @@ function [r] = BeginApplication(TheApplication, ~)
     entrancePupilDiameter = 2*str2double(char(entrancePupilDiameter)); % fix data type issues and converting the radius in diameter    
 
     % ray-maping function
-    for j = 1:sample
+    operandNumber = 1;
+    for x = 1:sample
+        
+        for y = 1:sample
+            
+            normalizedPupilCoordinateX = x/sample;
+            normalizedPupilCoordinateY = y/sample;
+            
+            % avoid considering points outside the pupil
+            if normalizedPupilCoordinateX^2 + normalizedPupilCoordinateY^2 >1
+                break
+            end                        
+            
+            % REAX
+            pupilCoordinateX = normalizedPupilCoordinateX*entrancePupilDiameter/2;
+            
+            OperandX = TheMFE.InsertNewOperandAt(operandNumber);
+            
+            OperandX.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.REAX);
+            
+            OperandX_SurfCell = OperandX.GetCellAt(2);
+            OperandX_SurfCell.IntegerValue = 4;
+            
+            OperandX_PxCell = OperandX.GetCellAt(6);
+            OperandX_PxCell.Value = string(normalizedPupilCoordinateX);
+            OperandX_PyCell = OperandX.GetCellAt(7);
+            OperandX_PyCell.Value = string(normalizedPupilCoordinateY);
+            
+            targetX = xExtent * erf(sqrt(2)*pupilCoordinateX/w); % annalytical ray-mapping function for rectangular uniform illumination from gaussian input
+            OperandX.Target = targetX;
 
-        Operand_j = TheMFE.InsertNewOperandAt(j);
-        Operand_j.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.REAX);
-        Operand_j.Weight = 1.0;
+            OperandX.Weight = 1.0;
+            
+            % REAY
+            pupilCoordinateY = normalizedPupilCoordinateY*entrancePupilDiameter/2;
+            
+            OperandY = TheMFE.InsertNewOperandAt(operandNumber + 1);
 
-        normalizedPupilCoordinate = j/sample;
-        pupilCoordinate = normalizedPupilCoordinate*entrancePupilDiameter/2; % points along the pupil radius
-        target = -k*sqrt(1-exp(-2*pupilCoordinate^2/w^2)); % annalytical ray-mapping function for circular uniform illumination from gaussian input
+            OperandY.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.REAY);
+            
+            OperandY_SurfCell = OperandY.GetCellAt(2);
+            OperandY_SurfCell.IntegerValue = 4;
+            
+            OperandY_PxCell = OperandY.GetCellAt(6);
+            OperandY_PxCell.Value = string(normalizedPupilCoordinateX);
+            OperandY_PyCell = OperandY.GetCellAt(7);
+            OperandY_PyCell.Value = string(normalizedPupilCoordinateY);
+            
+            targetY = yExtent * erf(sqrt(2)*pupilCoordinateY/w); % annalytical ray-mapping function for rectangular uniform illumination from gaussian input
+            OperandY.Target = targetY;
 
-        Operand_j.Target = target;
+            OperandY.Weight = 1.0;
 
-        Operand_1_SurfCell = Operand_j.GetCellAt(2);
-        Operand_1_SurfCell.IntegerValue = 4;
-
-        Operand_1_PxCell = Operand_j.GetCellAt(6);
-        Operand_1_PxCell.Value = string(normalizedPupilCoordinate);
+            % increase operandNumber
+            operandNumber = operandNumber + 2;
+            
+        end
         
     end
 
@@ -230,7 +268,7 @@ function [r] = BeginApplication(TheApplication, ~)
     Surface_3.ConicCell.MakeSolveVariable();
 
     % loop across order: optimization for different number of orders to define freeform surface
-    for order = 4:2:highestOrder % even aspher surface defined by extended polynomial: no order 1 term
+    for order = lowerOrder:2:highestOrder % even aspher surface defined by extended polynomial: no order 1 term
         
         % set variables up to order taking into account the symetries of the problem
         for currentOrder = 4:2:order % order 2 corresponds to conic constant and only even orders are considered
@@ -245,12 +283,12 @@ function [r] = BeginApplication(TheApplication, ~)
             for yOrder = 2:2:currentOrder
                 
                 parNumber = parNumberXcurrentOrderY0 + yOrder;
-                scaleFactor = nchoosek(currentOrder/2, yOrder/2);
+                %scaleFactor = nchoosek(currentOrder/2, yOrder/2);
                 Surface_3currentCrossTermCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumber)));
-                Solver = Surface_3currentCrossTermCell.CreateSolveType(ZOSAPI.Editors.SolveType.SurfacePickup);
-                Solver.S_SurfacePickup_.Surface = 3;
-                Solver.S_SurfacePickup_.ScaleFactor = scaleFactor;
-                Solver.S_SurfacePickup_.Column = ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumberXcurrentOrderY0));
+                Solver = Surface_3currentCrossTermCell.CreateSolveType(ZOSAPI.Editors.SolveType.Variable);
+                %Solver.S_SurfacePickup_.Surface = 3;
+                %Solver.S_SurfacePickup_.ScaleFactor = scaleFactor;
+                %Solver.S_SurfacePickup_.Column = ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumberXcurrentOrderY0));
                 Surface_3currentCrossTermCell.SetSolveData(Solver)
                 
             end
