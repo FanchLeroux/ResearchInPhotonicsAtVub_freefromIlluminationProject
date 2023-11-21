@@ -283,12 +283,8 @@ function [r] = BeginApplication(TheApplication, ~)
             for yOrder = 2:2:currentOrder
                 
                 parNumber = parNumberXcurrentOrderY0 + yOrder;
-                %scaleFactor = nchoosek(currentOrder/2, yOrder/2);
                 Surface_3currentCrossTermCell = Surface_3.GetSurfaceCell(ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumber)));
                 Solver = Surface_3currentCrossTermCell.CreateSolveType(ZOSAPI.Editors.SolveType.Variable);
-                %Solver.S_SurfacePickup_.Surface = 3;
-                %Solver.S_SurfacePickup_.ScaleFactor = scaleFactor;
-                %Solver.S_SurfacePickup_.Column = ZOSAPI.Editors.LDE.SurfaceColumn.("Par"+string(parNumberXcurrentOrderY0));
                 Surface_3currentCrossTermCell.SetSolveData(Solver)
                 
             end

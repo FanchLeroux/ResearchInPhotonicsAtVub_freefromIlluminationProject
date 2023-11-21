@@ -1,0 +1,24 @@
+Input Shape   lambertian 
+theta = 16.6; % ° half angle of the maximum cone of light emitted by the LED reaching the input plane 
+distanceLedInputPlane = 50e-3; % [m]
+Output Shape       square 
+Computation time (s)     599.2501 
+Sampling XY   201 
+Alpha parameter 0.050 
+Iterations   100 
+Last J 4.07007 
+Polygon Parameter 1.00000 
+
+
+file [type]: definition
+prescription [.txt]: description of the simulation conditions.
+M1, M2 [double matrices]: mapping function for x-coordinate and y-coordinate, respectively.
+Zx, Zy [double matrices]: Pupil ray positions in x and y.
+ZM1, ZM2 [double matrices]: M1 and M2 subsamples, which include only the target positions
+contained by the circular entrance aperture.
+J [double]: Convergence error.
+
+Plot the mapping function by executing 
+% figure(); plot(Zx,Zy,'*')
+figure(); plot(ZM1,ZM2,'k.')
+xlabel('m1');ylabel('m2')
