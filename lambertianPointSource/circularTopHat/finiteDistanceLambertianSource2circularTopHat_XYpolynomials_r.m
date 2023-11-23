@@ -35,9 +35,9 @@ function [r] = BeginApplication(TheApplication, ~)
 
     dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\lambertianPointSource\circularTopHat\";
     resultDir = dirc + "results\";
-    rayMappingFunctionDir = dirc + "rayMappingFunctions\fromAlejandro20231120\";
+    rayMappingFunctionDir = dirc + "rayMappingFunctions\fromAlejandro20231123\";
     
-    zemaxFileName = dirc + "finiteDistanceLambertianSource2circularTopHat_XYpolynomials_r.zos";    
+    zemaxFileName = dirc + "20231123_finiteDistanceLambertianSource2circularTopHat_XYpolynomials.zos";    
     cfg1FileName = dirc + "config\geometricImageAnalysis1.cfg";
     cfg2FileName = dirc + "config\geometricImageAnalysis2.cfg";
 
@@ -62,8 +62,8 @@ function [r] = BeginApplication(TheApplication, ~)
     imagePixel = 100; % (timeConsuming) number of pixels across the diameter
 
     % system start design. note that all surfaces are flat before optimization
-    distanceSourceLens = 50; % [mm] distance between Source and freeform lens entrance facet (works with 50)
-    apertureAngle = 16.6; % [°] half aperture angle (works with 16.6)
+    distanceSourceLens = 10; % [mm] distance between Source and freeform lens entrance facet (works with 50)
+    apertureAngle = 86.1859; % [°] half aperture angle (works with 16.6)
     objectSpaceNA = sin(pi/180 * apertureAngle);
     backFocalLength = 70;
     

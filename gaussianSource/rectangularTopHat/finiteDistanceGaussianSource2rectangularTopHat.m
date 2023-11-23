@@ -52,7 +52,7 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % optimization
     optimize = 1; % [bool] choose to perform or not local optimization
-    highestOrder = 8; % (timeConsuming) highest order of the polynomial defining the freeform surface
+    highestOrder = 10; % (timeConsuming) highest order of the polynomial defining the freeform surface
     lowerOrder = 4; % >= 4 lower order of the polynomial defining the freeform surface
     scaleFactorNormRadius = 1.2; % factor used to define the normalization radius of surface 3 from the radius of surface 2
     sample = 100; % (timeConsuming) pupil sampling for the ray-mapping function targets computations
