@@ -33,7 +33,7 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % 8<----------------- Define directories and file names ----------------->8
 
-    dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\rectangularTopHat\"; % directory where the ZEMAX .zos file will be generated
+    dirc = "D:\moi\vub\researchInPhotonics\zemax\zosApi\gaussianSource\rectangularTopHat\"; % directory where the ZEMAX .zos file will be generated
     resultDir = dirc + "results\";
     
     zemaxFileName = dirc + "finiteDistanceGaussianSource2rectangularTopHat.zos";    
@@ -52,7 +52,7 @@ function [r] = BeginApplication(TheApplication, ~)
 
     % optimization
     optimize = 1; % [bool] choose to perform or not local optimization
-    highestOrder = 20; % (timeConsuming) highest order of the polynomial defining the freeform surface
+    highestOrder = 8; % (timeConsuming) highest order of the polynomial defining the freeform surface
     lowerOrder = 4; % >= 4 lower order of the polynomial defining the freeform surface
     scaleFactorNormRadius = 1.2; % factor used to define the normalization radius of surface 3 from the radius of surface 2
     sample = 100; % (timeConsuming) pupil sampling for the ray-mapping function targets computations
@@ -248,7 +248,7 @@ function [r] = BeginApplication(TheApplication, ~)
     end
 
     % constraints
-    edgeConstraint = TheMFE.InsertNewOperandAt(sample+1);
+    edgeConstraint = TheMFE.InsertNewOperandAt(operandNumber);
     edgeConstraint.ChangeType(ZOSAPI.Editors.MFE.MeritOperandType.MNEG);
 
     edgeConstraint_Surf1cell = edgeConstraint.GetCellAt(2);
