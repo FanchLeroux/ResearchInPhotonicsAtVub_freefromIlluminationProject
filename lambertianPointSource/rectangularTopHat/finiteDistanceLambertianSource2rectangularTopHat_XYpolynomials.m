@@ -37,7 +37,7 @@ function [r] = BeginApplication(TheApplication, ~)
     resultDir = dirc + "results\";
     rayMappingFunctionDir = dirc + "rayMappingFunctions\fromAlejandro20231120\";
     
-    zemaxFileName = dirc + "finiteDistanceLambertianSource2circularTopHat_XYpolynomials_r.zos";    
+    zemaxFileName = dirc + "finiteDistanceLambertianSource2rectangularTopHat_XYpolynomials.zos";    
     cfg1FileName = dirc + "config\geometricImageAnalysis1.cfg";
     cfg2FileName = dirc + "config\geometricImageAnalysis2.cfg";
 
