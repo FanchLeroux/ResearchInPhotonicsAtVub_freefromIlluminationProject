@@ -399,6 +399,17 @@ function [r] = BeginApplication(TheApplication, ~)
     
 end
 
+%% Tools
+
+function u = uniformity(irradianceDistribution)
+
+    N = sum(sum(irradianceDistribution>0));
+    meanIrradiance = sum(sum(irradianceDistribution))/N;
+    
+    u = 1 - sum(abs(irradianceDistribution(irradianceDistribution>0)-meanIrradiance))/(N*meanIrradiance);
+
+end
+
 %% else
 
 function app = InitConnection()
